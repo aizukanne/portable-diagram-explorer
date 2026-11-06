@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "node build/build.mjs",
-    "test": "node --test test/unit/",
+    "test": "node --test test/unit/*.test.mjs",
     "e2e": "scripts/e2e.sh"
   },
   "devDependencies": {
