@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { bundle } from './bundle.mjs';
 import { jsonForHtml } from '../src/core/embed.js';
+import { PROJECT_SCHEMA } from '../src/core/project-schema.js';
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const VERSION = pkg.version;
@@ -84,6 +85,7 @@ export function buildAll({ outDir = 'dist' } = {}) {
   const editor = pre + `<script type="application/json" id="pde-self">${jsonForHtml(selfTemplate)}</script>` + post;
 
   mkdirSync(outDir, { recursive: true });
+  writeFileSync(`${outDir}/project.schema.json`, `${JSON.stringify(PROJECT_SCHEMA, null, 2)}\n`);
   writeFileSync(`${outDir}/frame.html`, frameDoc);
   writeFileSync(`${outDir}/presentation-template.html`, presentationTemplate);
   writeFileSync(`${outDir}/editor.html`, editor);
@@ -92,6 +94,8 @@ export function buildAll({ outDir = 'dist' } = {}) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const r = buildAll();
+  // The shipped schema is generated from the canonical module (design D5).
+  writeFileSync('schema/project.schema.json', `${JSON.stringify(PROJECT_SCHEMA, null, 2)}\n`);
   const kb = (s) => `${(Buffer.byteLength(s) / 1024).toFixed(1)} KiB`;
   console.log(`editor.html ${kb(r.editor)} · presentation-template.html ${kb(r.presentationTemplate)} · frame ${kb(r.frameDoc)} · v${r.version}`);
   if (existsSync('samples/customer-platform/project.json')) {

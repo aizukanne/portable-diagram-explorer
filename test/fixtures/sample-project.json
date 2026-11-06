@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "projectId": "p-demo",
+  "title": "Customer Platform",
+  "rootDiagramId": "d-overview",
+  "assets": [
+    {
+      "id": "a-overview",
+      "path": "assets/overview.png",
+      "mimeType": "image/png",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "a-identity",
+      "path": "assets/identity.png",
+      "mimeType": "image/png",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "a-mapping",
+      "path": "assets/mapping.png",
+      "mimeType": "image/png",
+      "width": 1600,
+      "height": 1000
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "d-overview",
+      "title": "Platform overview",
+      "assetId": "a-overview",
+      "description": "Main systems and their connections.",
+      "hotspots": [
+        {
+          "id": "h-identity",
+          "label": "Identity service",
+          "tooltip": "Authentication and account association",
+          "rect": {
+            "x": 0.2,
+            "y": 0.25,
+            "width": 0.18,
+            "height": 0.12
+          },
+          "zIndex": 1,
+          "defaultActionId": "open-identity",
+          "actions": [
+            {
+              "id": "open-identity",
+              "label": "Open HLD",
+              "type": "diagram",
+              "targetDiagramId": "d-identity"
+            },
+            {
+              "id": "identity-details",
+              "label": "Read description",
+              "type": "details",
+              "text": "Authenticates users and resolves their permitted accounts."
+            }
+          ]
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "id": "d-identity",
+      "title": "Identity service HLD",
+      "assetId": "a-identity",
+      "description": "Authentication and account lookup.",
+      "hotspots": [
+        {
+          "id": "h-mapping",
+          "label": "Account association",
+          "tooltip": "Open the detailed association design",
+          "rect": {
+            "x": 0.45,
+            "y": 0.3,
+            "width": 0.2,
+            "height": 0.15
+          },
+          "zIndex": 1,
+          "defaultActionId": "open-mapping",
+          "actions": [
+            {
+              "id": "open-mapping",
+              "label": "Open LLD",
+              "type": "diagram",
+              "targetDiagramId": "d-mapping"
+            }
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "id": "n-lookup",
+          "text": "Account IDs come from the internal system.",
+          "x": 0.05,
+          "y": 0.85,
+          "width": 0.4
+        }
+      ]
+    },
+    {
+      "id": "d-mapping",
+      "title": "Account association LLD",
+      "assetId": "a-mapping",
+      "description": "Detailed identity-to-account relationship.",
+      "hotspots": [],
+      "annotations": []
+    }
+  ],
+  "settings": {
+    "tooltipDelayMs": 350,
+    "showHotspotHints": true
+  }
+}
