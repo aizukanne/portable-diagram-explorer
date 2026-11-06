@@ -1,0 +1,172 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { deflateSync } from 'node:zlib';
+import { buildProjectZip, readProjectZip, readLooseFiles, buildPresentationHtml, readPresentationHtml, assignAssetPaths } from '../../src/core/package.js';
+import { writeZip, readZip } from '../../src/core/zip.js';
+import { measureEnvelope } from '../../src/core/envelope.js';
+import { sniffImage, sniffFileKind, slug } from '../../src/core/sniff.js';
+import { buildAll } from '../../build/build.mjs';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+
+const enc = (s) => new TextEncoder().encode(s);
+const sample = () => JSON.parse(readFileSync('test/fixtures/sample-project.json', 'utf8'));
+
+// A real, decodable PNG of the given size (solid colour), so sniffing and sizes are genuine.
+export function png(w, h, rgb = [200, 60, 40]) {
+  const crcT = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (b) => { let c = 0xffffffff; for (const x of b) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => { const t = Buffer.from(type); const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const c = Buffer.alloc(4); c.writeUInt32BE(crc(Buffer.concat([t, data]))); return Buffer.concat([len, t, data, c]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, () => rgb).flat())]);
+  const raw = Buffer.concat(Array.from({ length: h }, () => row));
+  return new Uint8Array(Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]));
+}
+
+const fixture = () => {
+  const project = sample();
+  const assets = new Map(project.assets.map((a, i) => [a.id, png(4 + i, 3 + i, [i * 60, 100, 150])]));
+  return { project, assets };
+};
+
+const out = mkdtempSync(path.join(tmpdir(), 'pde-pkg-'));
+const TEMPLATE = buildAll({ outDir: out }).presentationTemplate;
+test.after(() => rmSync(out, { recursive: true, force: true }));
+
+test('sniffing decides the type from bytes; slugs are safe', () => {
+  assert.equal(sniffImage(png(1, 1)).mimeType, 'image/png');
+  assert.equal(sniffImage(Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])).mimeType, 'image/jpeg');
+  assert.equal(sniffImage(enc('RIFF\0\0\0\0WEBPVP8 ')).mimeType, 'image/webp');
+  assert.equal(sniffImage(enc('<svg xmlns="x"></svg>')), null);
+  assert.equal(sniffFileKind(enc('﻿  {"a":1}')), 'json');
+  assert.equal(sniffFileKind(enc('<!doctype html>')), 'html');
+  assert.equal(slug('Überblick: Platform (v2).PNG'), 'uberblick-platform-v2');
+  assert.equal(slug('../../etc/passwd'), 'etc-passwd');
+  assert.equal(slug('***'), 'untitled');
+});
+
+test('project zip round trip preserves everything and asset bytes exactly; paths are deterministic', async () => {
+  const { project, assets } = fixture();
+  const { bytes } = await buildProjectZip(project, assets, '<!doctype html><title>e</title>', '0.1.0');
+  const back = await readProjectZip(bytes);
+  assert.deepEqual(back.issues.filter((i) => i.severity === 'error'), []);
+  for (const [id, b] of assets) assert.deepEqual(back.assets.get(id), b);
+  assert.equal(back.project.assets[0].path, 'assets/a-overview-overview.png');
+  const strip = (p) => ({ ...p, assets: p.assets.map(({ path: _p, ...rest }) => rest) });
+  assert.deepEqual(strip(back.project), strip(project));
+  // Saving the re-opened project gives the same archive again (no drift across saves).
+  const again = await buildProjectZip(back.project, back.assets, '<!doctype html><title>e</title>', '0.1.0');
+  assert.deepEqual(again.bytes, bytes);
+  const files = await readZip(bytes);
+  assert.deepEqual([...files.keys()].sort(), ['README.txt', 'assets/a-identity-identity.png', 'assets/a-mapping-mapping.png', 'assets/a-overview-overview.png', 'editor.html', 'project.json']);
+});
+
+test('asset ids differing only in case still get distinct paths', () => {
+  const paths = assignAssetPaths({ assets: [{ id: 'A-x', mimeType: 'image/png', path: 'assets/p.png' }, { id: 'a-x', mimeType: 'image/png', path: 'assets/p.png' }] }).map((a) => a.path);
+  assert.equal(new Set(paths).size, 2);
+});
+
+test('an unexpected zip entry is rejected by name; nothing is opened', async () => {
+  const zip = await writeZip([{ name: 'project.json', bytes: enc(JSON.stringify(sample())) }, { name: 'run.sh', bytes: enc('rm -rf /') }]);
+  const r = await readProjectZip(zip);
+  assert.equal(r.project, null);
+  assert.equal(r.issues[0].code, 'E_PKG_UNEXPECTED_ENTRY');
+  assert.equal(r.issues[0].received, '"run.sh"');
+});
+
+test('a corrupt archive becomes an issue, not an exception', async () => {
+  const r = await readProjectZip(enc('PK\u0003\u0004 truncated garbage'));
+  assert.equal(r.project, null);
+  assert.equal(r.issues[0].code, 'E_PKG_TRUNCATED');
+});
+
+test('a missing image file and a mismatched image type are explicit errors', async () => {
+  const { project, assets } = fixture();
+  const { bytes } = await buildProjectZip(project, assets, 'x');
+  const files = await readZip(bytes);
+  files.delete('assets/a-mapping-mapping.png');
+  const r1 = await readProjectZip(await writeZip([...files].map(([name, b]) => ({ name, bytes: b }))));
+  assert.equal(r1.project, null);
+  assert.equal(r1.issues[0].code, 'E_PKG_MISSING_ASSET');
+  files.set('assets/a-mapping-mapping.png', Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8]));
+  const r2 = await readProjectZip(await writeZip([...files].map(([name, b]) => ({ name, bytes: b }))));
+  assert.equal(r2.issues[0].code, 'E_ASSET_TYPE');
+});
+
+test('semantic errors open the project with the errors listed (content is never dropped)', async () => {
+  const { project, assets } = fixture();
+  project.diagrams[0].hotspots[0].actions[0].targetDiagramId = 'd-gone';
+  const { bytes } = await buildProjectZip(project, assets, 'x');
+  const r = await readProjectZip(bytes);
+  assert.ok(r.project);
+  assert.ok(r.issues.some((i) => i.code === 'E_TARGET_REF'));
+});
+
+test('future schema is refused before anything else', async () => {
+  const { project, assets } = fixture();
+  project.schemaVersion = 7;
+  const { bytes } = await buildProjectZip(project, assets, 'x');
+  const r = await readProjectZip(bytes);
+  assert.equal(r.project, null);
+  assert.equal(r.issues[0].code, 'E_FUTURE_SCHEMA');
+});
+
+test('supplied editor.html is never part of the result', async () => {
+  const { project, assets } = fixture();
+  const { bytes } = await buildProjectZip(project, assets, '<script>evil()</script>');
+  const r = await readProjectZip(bytes);
+  assert.ok(!JSON.stringify(Object.keys(r)).includes('editor'));
+});
+
+test('presentation embeds data inertly, round-trips, and carries only referenced images', () => {
+  const { project, assets } = fixture();
+  project.title = 'A & B </title><script>x()</script>';
+  project.diagrams[0].description = '</script><img src=x onerror=alert(1)> ';
+  project.assets.push({ id: 'a-unused', path: 'assets/unused.png', mimeType: 'image/png', width: 1, height: 1 });
+  assets.set('a-unused', png(1, 1));
+  const html = buildPresentationHtml(TEMPLATE, project, assets, '0.1.0');
+  assert.equal(html.match(/<\/script>/g).length, TEMPLATE.match(/<\/script>/g).length);
+  assert.equal(html.match(/<script/g).length, TEMPLATE.match(/<script/g).length);
+  assert.match(html, /<title>A &amp; B &lt;\/title&gt;&lt;script&gt;x\(\)&lt;\/script&gt;<\/title>/);
+  const r = readPresentationHtml(html);
+  assert.equal(r.project.diagrams[0].description, project.diagrams[0].description);
+  assert.ok(!r.project.assets.some((a) => a.id === 'a-unused'));
+  for (const a of r.project.assets) assert.deepEqual(r.assets.get(a.id), assets.get(a.id));
+});
+
+test('export refuses a project with errors', () => {
+  const { project, assets } = fixture();
+  project.diagrams[1].alignmentReviewRequired = true;
+  assert.throws(() => buildPresentationHtml(TEMPLATE, project, assets, '0.1.0'), /E_ALIGN_REVIEW/);
+});
+
+test('a page that is not our presentation is refused with an explanation', () => {
+  const r = readPresentationHtml('<!doctype html><p>hello</p>');
+  assert.equal(r.project, null);
+  assert.equal(r.issues[0].code, 'E_PRES_NO_DATA');
+});
+
+test('loose files: match by path, then by unique name; duplicates are never guessed', () => {
+  const { project, assets } = fixture();
+  const pj = { name: 'project.json', relativePath: 'proj/project.json', bytes: enc(JSON.stringify(project)) };
+  const imgs = project.assets.map((a) => ({ name: a.path.split('/').pop(), relativePath: `proj/${a.path}`, bytes: assets.get(a.id) }));
+  assert.equal(readLooseFiles([pj, ...imgs]).issues.filter((i) => i.severity === 'error').length, 0);
+  const flat = imgs.map((f) => ({ ...f, relativePath: '' }));
+  assert.ok(readLooseFiles([pj, ...flat]).project);
+  const dup = [pj, ...flat, { ...flat[0], relativePath: '' }];
+  const r = readLooseFiles(dup);
+  assert.equal(r.project, null);
+  assert.equal(r.issues[0].code, 'E_AMBIGUOUS_ASSET');
+});
+
+test('envelope warns above the spec §12 numbers and not below', () => {
+  const { project, assets } = fixture();
+  assert.deepEqual(measureEnvelope(project, assets).warnings, []);
+  const big = structuredClone(project);
+  for (let i = 0; i < 51; i++) big.diagrams.push({ ...structuredClone(project.diagrams[2]), id: `d-x${i}` });
+  big.diagrams[0].hotspots = Array.from({ length: 101 }, (_, i) => ({ ...structuredClone(project.diagrams[0].hotspots[0]), id: `h${i}` }));
+  const codes = measureEnvelope(big, assets).warnings.map((w) => w.code);
+  assert.ok(codes.includes('W_ENVELOPE_DIAGRAMS') && codes.includes('W_ENVELOPE_SCENE'));
+});
