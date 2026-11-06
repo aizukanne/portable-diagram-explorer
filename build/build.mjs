@@ -88,7 +88,7 @@ export function buildAll({ outDir = 'dist', withTestHarness = false } = {}) {
   // Test-only harness pages: same CSP discipline, never shipped (dist/test/).
   const harnesses = {};
   if (withTestHarness) {
-    for (const name of ['renderer-harness']) {
+    for (const name of ['renderer-harness', 'bridge-harness']) {
       const js = bundle(`test/e2e/harness/${name}.js`, { preamble: `const __BUILD__ = ${jsonForHtml({ version: VERSION, frameTemplate: frameDoc })};` });
       harnesses[name] = head(hostCsp(js), name) + `<body>\n<div id="pde-root"></div>\n<script>${js}</script>\n</body>\n</html>\n`;
     }
