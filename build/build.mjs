@@ -28,9 +28,10 @@ function checkCss(name, css) {
   return css;
 }
 
-export function buildAll({ outDir = 'dist' } = {}) {
-  const frameCss = checkCss('frame.css', read('src/styles/frame.css'));
-  const appCss = checkCss('app.css', read('src/styles/app.css'));
+export function buildAll({ outDir = 'dist', withTestHarness = false } = {}) {
+  const rendererCss = read('src/styles/renderer.css');
+  const frameCss = checkCss('frame.css', rendererCss + read('src/styles/frame.css'));
+  const appCss = checkCss('app.css', rendererCss + read('src/styles/app.css'));
 
   // 1. Frame document. It carries its own policy as well as inheriting the parent's.
   const frameJs = bundle('src/ui/frame-main.js', { preamble: `const __BUILD__ = ${jsonForHtml({ version: VERSION })};` });
@@ -84,7 +85,20 @@ export function buildAll({ outDir = 'dist' } = {}) {
   if (selfTemplate.split(SELF_MARK).length !== 2) throw new Error(`editor template must contain ${SELF_MARK} exactly once`);
   const editor = pre + `<script type="application/json" id="pde-self">${jsonForHtml(selfTemplate)}</script>` + post;
 
+  // Test-only harness pages: same CSP discipline, never shipped (dist/test/).
+  const harnesses = {};
+  if (withTestHarness) {
+    for (const name of ['renderer-harness']) {
+      const js = bundle(`test/e2e/harness/${name}.js`, { preamble: `const __BUILD__ = ${jsonForHtml({ version: VERSION, frameTemplate: frameDoc })};` });
+      harnesses[name] = head(hostCsp(js), name) + `<body>\n<div id="pde-root"></div>\n<script>${js}</script>\n</body>\n</html>\n`;
+    }
+  }
+
   mkdirSync(outDir, { recursive: true });
+  if (withTestHarness) {
+    mkdirSync(`${outDir}/test`, { recursive: true });
+    for (const [name, html] of Object.entries(harnesses)) writeFileSync(`${outDir}/test/${name}.html`, html);
+  }
   writeFileSync(`${outDir}/project.schema.json`, `${JSON.stringify(PROJECT_SCHEMA, null, 2)}\n`);
   writeFileSync(`${outDir}/frame.html`, frameDoc);
   writeFileSync(`${outDir}/presentation-template.html`, presentationTemplate);
@@ -93,7 +107,7 @@ export function buildAll({ outDir = 'dist' } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const r = buildAll();
+  const r = buildAll({ withTestHarness: process.argv.includes('--test') });
   // The shipped schema is generated from the canonical module (design D5).
   writeFileSync('schema/project.schema.json', `${JSON.stringify(PROJECT_SCHEMA, null, 2)}\n`);
   const kb = (s) => `${(Buffer.byteLength(s) / 1024).toFixed(1)} KiB`;

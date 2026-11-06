@@ -14,4 +14,4 @@ install='npm ci --no-audit --no-fund >/dev/null'
 docker run --rm --name "$name" --init --ipc=host \
   -u "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm \
   -v "$PWD":/work -w /work "$IMAGE" \
-  bash -c "$install && npx playwright test -c playwright.config.mjs $*"
+  bash -c "$install && node build/build.mjs --test >/dev/null && npx playwright test -c playwright.config.mjs $*"

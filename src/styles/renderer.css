@@ -1,0 +1,58 @@
+/* Scene renderer: shared by the presentation shell, the frame and the editor. */
+[hidden] { display: none !important; }
+.pde-viewport {
+  position: relative; overflow: hidden; touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  background: var(--pde-canvas, #e9edf2); cursor: grab; outline: none;
+}
+.pde-viewport.is-dragging { cursor: grabbing; }
+.pde-mode-edit[data-tool="hotspot"], .pde-mode-edit[data-tool="annotation"] { cursor: crosshair; }
+.pde-scene { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.pde-image {
+  position: absolute; left: 0; top: 0; display: block; max-width: none; max-height: none;
+  image-orientation: from-image; pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, .12);
+}
+.pde-notes { position: absolute; inset: 0; pointer-events: none; }
+.pde-annotation {
+  position: absolute; box-sizing: border-box; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere;
+  padding: .3em .45em; border: 1px solid #b59f3b; border-radius: .3em;
+  background: rgba(255, 251, 219, .94); color: #1c1917; line-height: 1.3;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+}
+.pde-mode-edit .pde-annotation { pointer-events: auto; cursor: move; }
+.pde-mode-edit .pde-annotation.is-selected { outline: 2px solid #dc2626; outline-offset: 1px; }
+.pde-hotspots { position: absolute; left: 0; top: 0; overflow: visible; }
+.pde-hotspot {
+  fill: rgba(37, 99, 235, .10); stroke: #1d4ed8; stroke-width: 2px; vector-effect: non-scaling-stroke;
+  cursor: pointer; outline: none;
+}
+.pde-hotspot:hover { fill: rgba(37, 99, 235, .24); }
+.pde-hotspot:focus { stroke: #b45309; stroke-width: 3px; fill: rgba(245, 158, 11, .20); }
+.pde-hints-off .pde-hotspot { fill: transparent; stroke: transparent; }
+.pde-hints-off .pde-hotspot:hover { fill: rgba(37, 99, 235, .08); }
+.pde-hints-off .pde-hotspot:focus { stroke: #b45309; fill: rgba(245, 158, 11, .14); }
+.pde-mode-edit .pde-hotspot { cursor: move; }
+.pde-mode-edit .pde-hotspot.is-selected { stroke: #dc2626; fill: rgba(220, 38, 38, .14); }
+.pde-handle { fill: #fff; stroke: #dc2626; stroke-width: 1.5px; vector-effect: non-scaling-stroke; }
+.pde-handle-nw, .pde-handle-se { cursor: nwse-resize; }
+.pde-handle-ne, .pde-handle-sw { cursor: nesw-resize; }
+.pde-handle-n, .pde-handle-s { cursor: ns-resize; }
+.pde-handle-e, .pde-handle-w { cursor: ew-resize; }
+.pde-draw-preview {
+  fill: rgba(220, 38, 38, .12); stroke: #dc2626; stroke-width: 1.5px; stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke; pointer-events: none;
+}
+.pde-tooltip {
+  position: absolute; left: 0; top: 0; z-index: 5; max-width: 22rem; pointer-events: none;
+  padding: .4rem .6rem; border-radius: .35rem; background: #111827; color: #f9fafb;
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif; white-space: pre-wrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+}
+.pde-hotspot-menu {
+  position: absolute; left: 0; top: 0; z-index: 6; width: 28px; height: 28px; padding: 0;
+  border: 1px solid #1f2937; border-radius: 50%; background: #fff; color: #111827;
+  font: 700 16px/1 system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+}
+.pde-hotspot-menu:focus-visible { outline: 3px solid #b45309; outline-offset: 1px; }
+.pde-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
