@@ -1,0 +1,6 @@
+node_modules/
+dist/
+spike/out/
+test-results/
+playwright-report/
+.cache/

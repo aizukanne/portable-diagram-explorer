@@ -1,0 +1,16 @@
+{
+  "name": "portable-diagram-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline, no-install interactive diagram explorer: clickable hotspots over existing architecture images, drill-down in one sandboxed modal iframe, portable HTML export.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "node build/build.mjs",
+    "test": "node --test test/unit/",
+    "e2e": "scripts/e2e.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  }
+}
