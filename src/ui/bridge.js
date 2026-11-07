@@ -114,13 +114,20 @@ export class FrameBridge {
     if (this.ready && this.sceneToken) this.post('COMMAND', { sceneToken: this.sceneToken, command });
   }
 
-  focusHotspot(hotspotId) {
+  // Move browser focus into the frame's window as well as onto the element: some
+  // engines leave window focus in the parent otherwise (measured in WebKit).
+  focusFrameWindow() {
     this.frame.focus();
+    try { this.frame.contentWindow.focus(); } catch { /* cross-origin focus() is permitted; ignore if not */ }
+  }
+
+  focusHotspot(hotspotId) {
+    this.focusFrameWindow();
     if (this.ready && this.sceneToken) this.post('FOCUS_HOTSPOT', { sceneToken: this.sceneToken, hotspotId });
   }
 
   focus(which = 'first') {
-    this.frame.focus();
+    this.focusFrameWindow();
     this.command(which === 'last' ? 'focusLast' : 'focusFirst');
   }
 

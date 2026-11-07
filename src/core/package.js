@@ -118,7 +118,7 @@ function admit(project, getBytes, issues) {
         `Replace ${got.name} with the original ${a.mimeType} file, or re-import the image in the editor.`));
       return;
     }
-    assets.set(a.id, got.bytes);
+    assets.set(a.id, got.headerOnly ? null : got.bytes);
   });
   if (assets.size !== project.assets.length) return null;
   issues.push(...v.errors, ...v.warnings);
@@ -220,7 +220,9 @@ export function buildPresentationHtml(template, project, assetBytes, appVersion)
   return template.split(TITLE_PLACEHOLDER).join(escapeHtmlText(project.title)).split(DATA_PLACEHOLDER).join(jsonForHtml(data));
 }
 
-export function readPresentationData(raw) {
+// options.decodeAssets=false: verify each image's type from its first bytes only and
+// keep the base64 (the viewer shows images as data: URLs and never needs the bytes).
+export function readPresentationData(raw, { decodeAssets = true } = {}) {
   const issues = [];
   const bad = (code, received, why, fix) => { issues.push(makeIssue(code, 'presentation', received, `a .presentation.html exported by Portable Diagram Explorer (format ${PRESENTATION_FORMAT_VERSION})`, why, fix)); return { project: null, assets: new Map(), issues }; };
   if (raw === null) return bad('E_PRES_NO_DATA', '(no embedded project data)', 'Only presentations exported by this application carry the project data needed for editing.', 'Choose a .presentation.html exported by Portable Diagram Explorer, or the project\'s .diagram.zip.');
@@ -239,12 +241,15 @@ export function readPresentationData(raw) {
     if (!e || typeof e.base64 !== 'string') {
       return { issue: makeIssue('E_PKG_MISSING_ASSET', `assets.${a.id}`, '(absent)', `embedded bytes for image ${a.id}`, 'The presentation must carry every image it shows.', 'Export the presentation again from the editor.') };
     }
-    try { return { bytes: base64ToBytes(e.base64), name: a.path }; } catch {
+    try {
+      if (!decodeAssets) return { bytes: base64ToBytes(e.base64.slice(0, 24)), name: a.path, headerOnly: true };
+      return { bytes: base64ToBytes(e.base64), name: a.path };
+    } catch {
       return { issue: makeIssue('E_PKG_CORRUPT', `assets.${a.id}`, '(invalid base64)', 'base64-encoded image bytes', 'The embedded image data is damaged.', 'Export the presentation again from the editor.') };
     }
   }, issues);
   if (!assets) return { project: null, assets: new Map(), issues };
-  return { project, assets, issues, appVersion: data.appVersion };
+  return { project, assets, issues, appVersion: data.appVersion, raw: data };
 }
 
 export function readPresentationHtml(text) {

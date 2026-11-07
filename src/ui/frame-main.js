@@ -47,15 +47,23 @@ window.addEventListener('message', (e) => {
   if (m.type === 'RENDER_SCENE') {
     sceneToken = m.sceneToken;
     const token = m.sceneToken;
+    // If the user is working inside the frame (keyboard Back, Enter on a hotspot),
+    // keep their focus here on the new scene: the selected hotspot, else the first.
+    const hadFocus = document.hasFocus();
     renderer.opts.tooltipDelayMs = m.settings.tooltipDelayMs;
     renderer.setHints(m.settings.showHotspotHints);
     renderer.setScene(m.scene, m.image.dataUrl, m.viewport, m.selectedHotspotId)
-      .then(() => { if (sceneToken === token) send('SCENE_READY', { sceneToken: token }); })
+      .then(() => {
+        if (sceneToken !== token) return;
+        if (hadFocus && !(m.selectedHotspotId && renderer.focusHotspot(m.selectedHotspotId))) renderer.focusEdge('first');
+        send('SCENE_READY', { sceneToken: token });
+      })
       .catch(() => { /* the parent's render timeout reports the failure */ });
     return;
   }
   if (m.sceneToken !== sceneToken) return;
   if (m.type === 'FOCUS_HOTSPOT') {
+    window.focus();
     if (!renderer.focusHotspot(m.hotspotId)) renderer.focusEdge('first');
     return;
   }
@@ -64,8 +72,8 @@ window.addEventListener('message', (e) => {
     case 'zoomIn': renderer.zoomBy(1.25); break;
     case 'zoomOut': renderer.zoomBy(0.8); break;
     case 'hideTooltip': renderer.hideTooltip(); break;
-    case 'focusFirst': if (!renderer.focusEdge('first')) host.focus(); break;
-    case 'focusLast': if (!renderer.focusEdge('last')) host.focus(); break;
+    case 'focusFirst': window.focus(); if (!renderer.focusEdge('first')) host.focus(); break;
+    case 'focusLast': window.focus(); if (!renderer.focusEdge('last')) host.focus(); break;
     default: break;
   }
 });

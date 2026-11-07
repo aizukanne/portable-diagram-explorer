@@ -11,7 +11,7 @@ import { bundle } from '../../build/bundle.mjs';
 import { jsonForHtml } from '../../src/core/embed.js';
 
 const out = mkdtempSync(path.join(tmpdir(), 'pde-build-'));
-const r = buildAll({ outDir: out });
+const r = await buildAll({ outDir: out });
 const h = (s) => `'sha256-${createHash('sha256').update(s).digest('base64')}'`;
 
 for (const [name, html] of [['editor', r.editor], ['presentation', r.presentationTemplate], ['frame', r.frameDoc]]) {
@@ -35,7 +35,8 @@ test('the editor reproduces its own bytes exactly (D6)', () => {
   const m = r.editor.match(/<script type="application\/json" id="pde-self">([\s\S]*?)<\/script>/);
   const tpl = JSON.parse(m[1]);
   assert.equal(tpl.split(SELF_MARK).length, 2);
-  const rebuilt = tpl.replace(SELF_MARK, `<script type="application/json" id="pde-self">${jsonForHtml(tpl)}</script>`);
+  // A function replacement: a string one would interpret "$'" and "$&" inside the bundle.
+  const rebuilt = tpl.replace(SELF_MARK, () => `<script type="application/json" id="pde-self">${jsonForHtml(tpl)}</script>`);
   assert.equal(rebuilt, r.editor);
 });
 

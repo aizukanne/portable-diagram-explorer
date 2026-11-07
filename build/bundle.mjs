@@ -24,7 +24,7 @@ export function bundle(entry, { preamble = '' } = {}) {
     if (chain.includes(abs)) throw new BundleError(`import cycle: ${[...chain, abs].map(rel).join(' -> ')}`);
     if (seen.has(abs)) return;
     const src = readFileSync(abs, 'utf8');
-    const lines = src.split('\n');
+    const lines = foldImports(src.split('\n'));
     const body = [];
     const exported = new Set();
     const imports = [];
@@ -76,3 +76,22 @@ export function bundle(entry, { preamble = '' } = {}) {
 }
 
 function rel(p) { return path.relative(process.cwd(), p); }
+
+// Fold a multi-line `import {\n a,\n b,\n} from './x.js';` onto its first line and
+// leave blank lines behind, so reported line numbers still match the source.
+function foldImports(lines) {
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^import\s*\{[^}]*$/.test(lines[i])) {
+      let j = i;
+      let joined = lines[i];
+      while (!joined.includes('}') && j + 1 < lines.length) { j += 1; joined += ` ${lines[j].trim()}`; }
+      out.push(joined.replace(/\s+/g, ' ').replace(/,\s*\}/, ' }'));
+      for (let k = i + 1; k <= j; k++) out.push('');
+      i = j;
+    } else {
+      out.push(lines[i]);
+    }
+  }
+  return out;
+}

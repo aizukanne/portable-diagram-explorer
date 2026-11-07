@@ -78,6 +78,11 @@ export class SceneRenderer {
     this.menuBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
     this.menuBtn.addEventListener('pointerenter', () => clearTimeout(this.menuBtnTimer));
     this.menuBtn.addEventListener('pointerleave', () => this.scheduleMenuBtnHide());
+    // The viewport never scrolls: all movement is the scene transform. Focusing a
+    // hotspot can still scroll an overflow:hidden box in some engines, which would
+    // shift everything by a few pixels (measured in WebKit), so undo any scroll.
+    this.bound.scroll = () => { if (host.scrollLeft || host.scrollTop) { host.scrollLeft = 0; host.scrollTop = 0; } };
+    host.addEventListener('scroll', this.bound.scroll);
     this.resizeObs = new ResizeObserver(() => this.apply());
     this.resizeObs.observe(host);
   }
@@ -266,6 +271,7 @@ export class SceneRenderer {
     if (quiet) this.quietFocus = true;
     el.focus({ preventScroll: true });
     this.quietFocus = false;
+    this.bound.scroll();
     return true;
   }
 
@@ -394,6 +400,10 @@ export class SceneRenderer {
     }
     if (this.pointers.size > 2) return;
     try { this.host.setPointerCapture(e.pointerId); } catch { /* element may be detached */ }
+    // Edit gestures cancel the default action (so dragging does not select text),
+    // which would also leave keyboard focus in whatever field was used last. Move it
+    // to the canvas so Delete, Ctrl+D and the arrow keys act on the selection.
+    if (this.opts.mode === 'edit' && !this.host.contains(document.activeElement) && this.host.tabIndex >= 0) this.host.focus({ preventScroll: true });
     const hotspotId = this.hitHotspotId(e.target);
     const handle = e.target.dataset ? e.target.dataset.handle : undefined;
     const noteEl = e.target.closest ? e.target.closest('.pde-annotation') : null;
@@ -608,6 +618,7 @@ export class SceneRenderer {
     this.host.removeEventListener('contextmenu', this.bound.context);
     this.host.removeEventListener('keydown', this.bound.keydown);
     this.host.removeEventListener('keyup', this.bound.keyup);
+    this.host.removeEventListener('scroll', this.bound.scroll);
     this.img.removeAttribute('src');
     clear(this.host);
   }

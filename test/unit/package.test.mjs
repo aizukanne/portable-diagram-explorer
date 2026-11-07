@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { deflateSync } from 'node:zlib';
+import { png } from '../helpers/png.mjs';
 import { buildProjectZip, readProjectZip, readLooseFiles, buildPresentationHtml, readPresentationHtml, assignAssetPaths } from '../../src/core/package.js';
 import { writeZip, readZip } from '../../src/core/zip.js';
 import { measureEnvelope } from '../../src/core/envelope.js';
@@ -14,17 +14,6 @@ import path from 'node:path';
 const enc = (s) => new TextEncoder().encode(s);
 const sample = () => JSON.parse(readFileSync('test/fixtures/sample-project.json', 'utf8'));
 
-// A real, decodable PNG of the given size (solid colour), so sniffing and sizes are genuine.
-export function png(w, h, rgb = [200, 60, 40]) {
-  const crcT = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
-  const crc = (b) => { let c = 0xffffffff; for (const x of b) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
-  const chunk = (type, data) => { const t = Buffer.from(type); const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const c = Buffer.alloc(4); c.writeUInt32BE(crc(Buffer.concat([t, data]))); return Buffer.concat([len, t, data, c]); };
-  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
-  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: w }, () => rgb).flat())]);
-  const raw = Buffer.concat(Array.from({ length: h }, () => row));
-  return new Uint8Array(Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]));
-}
-
 const fixture = () => {
   const project = sample();
   const assets = new Map(project.assets.map((a, i) => [a.id, png(4 + i, 3 + i, [i * 60, 100, 150])]));
@@ -32,7 +21,7 @@ const fixture = () => {
 };
 
 const out = mkdtempSync(path.join(tmpdir(), 'pde-pkg-'));
-const TEMPLATE = buildAll({ outDir: out }).presentationTemplate;
+const TEMPLATE = (await buildAll({ outDir: out })).presentationTemplate;
 test.after(() => rmSync(out, { recursive: true, force: true }));
 
 test('sniffing decides the type from bytes; slugs are safe', () => {

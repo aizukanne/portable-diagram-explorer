@@ -1,7 +1,7 @@
 // Safe embedding of data inside HTML documents (design MR-2, D7).
 //
-// A string placed inside an inline <script> ends that script at the first
-// "</script" it contains, whatever the surrounding JavaScript syntax says.
+// A string placed inside an inline script element ends that element at the first
+// closing script tag it contains, whatever the surrounding JavaScript syntax says.
 // Every value we embed therefore escapes the characters that can terminate or
 // re-interpret the host element. JSON.parse reverses the escapes exactly.
 
@@ -14,12 +14,12 @@ export function jsonForHtml(value) {
     .replace(/\u2029/g, '\\u2029');
 }
 
-// Find <script type="application/json" id="ID">…</script> in a document's text and
+// Find the JSON script block with the given id in a document's text and
 // return the raw element body, or null. Nothing is executed. In the browser the
 // caller should prefer DOMParser (see extractJsonBlockDom); this scanner exists so
 // Node-side code (build, tests) shares the exact contract.
 export function extractJsonBlock(htmlText, id) {
-  const open = '<script type="application/json" id="' + id + '">';
+  const open = '<' + 'script type="application/json" id="' + id + '">';
   const start = htmlText.indexOf(open);
   if (start < 0) return null;
   if (htmlText.indexOf(open, start + open.length) >= 0) return null; // ambiguous: two blocks

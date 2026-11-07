@@ -28,7 +28,7 @@ function checkCss(name, css) {
   return css;
 }
 
-export function buildAll({ outDir = 'dist', withTestHarness = false } = {}) {
+export async function buildAll({ outDir = 'dist', withTestHarness = false } = {}) {
   const rendererCss = read('src/styles/renderer.css');
   const frameCss = checkCss('frame.css', rendererCss + read('src/styles/frame.css'));
   const appCss = checkCss('app.css', rendererCss + read('src/styles/app.css'));
@@ -98,6 +98,8 @@ export function buildAll({ outDir = 'dist', withTestHarness = false } = {}) {
   if (withTestHarness) {
     mkdirSync(`${outDir}/test`, { recursive: true });
     for (const [name, html] of Object.entries(harnesses)) writeFileSync(`${outDir}/test/${name}.html`, html);
+    const { writeTestFixtures } = await import('./test-fixtures.mjs');
+    await writeTestFixtures(outDir, presentationTemplate, VERSION, editor);
   }
   writeFileSync(`${outDir}/project.schema.json`, `${JSON.stringify(PROJECT_SCHEMA, null, 2)}\n`);
   writeFileSync(`${outDir}/frame.html`, frameDoc);
@@ -107,7 +109,7 @@ export function buildAll({ outDir = 'dist', withTestHarness = false } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const r = buildAll({ withTestHarness: process.argv.includes('--test') });
+  const r = await buildAll({ withTestHarness: process.argv.includes('--test') });
   // The shipped schema is generated from the canonical module (design D5).
   writeFileSync('schema/project.schema.json', `${JSON.stringify(PROJECT_SCHEMA, null, 2)}\n`);
   const kb = (s) => `${(Buffer.byteLength(s) / 1024).toFixed(1)} KiB`;
