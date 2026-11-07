@@ -7,7 +7,7 @@
 }
 .pde-viewport.is-dragging { cursor: grabbing; }
 .pde-mode-edit[data-tool="hotspot"], .pde-mode-edit[data-tool="annotation"] { cursor: crosshair; }
-.pde-scene { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.pde-scene { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 .pde-image {
   position: absolute; left: 0; top: 0; display: block; max-width: none; max-height: none;
   image-orientation: from-image; pointer-events: none;

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" font-family="DejaVu Sans, Arial, sans-serif">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<rect x="0" y="0" width="1600" height="78" fill="#0f172a"/>
+<text x="40" y="51" font-size="32" font-weight="700" fill="#ffffff">Account association — low-level design</text>
+<line x1="480.0" y1="310.0" x2="620.0" y2="310.0" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="980.0" y1="310.0" x2="1120.0" y2="310.0" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="800.0" y1="440.0" x2="800.0" y2="600.0" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<g><rect x="120" y="180" width="360" height="260" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="3"/>
+<text x="300" y="304" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">users</text>
+<text x="300" y="340" text-anchor="middle" font-size="21" fill="#334155">user_id • subject • email</text></g>
+<g><rect x="620" y="180" width="360" height="260" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="3"/>
+<text x="800" y="304" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">account_links</text>
+<text x="800" y="340" text-anchor="middle" font-size="21" fill="#334155">user_id • account_id • role</text></g>
+<g><rect x="1120" y="180" width="360" height="260" rx="14" fill="#fef3c7" stroke="#b45309" stroke-width="3"/>
+<text x="1300" y="304" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">billing.accounts</text>
+<text x="1300" y="340" text-anchor="middle" font-size="21" fill="#334155">system of record</text></g>
+<g><rect x="620" y="600" width="360" height="180" rx="14" fill="#ede9fe" stroke="#6d28d9" stroke-width="3"/>
+<text x="800" y="684" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">Lookup cache</text>
+<text x="800" y="720" text-anchor="middle" font-size="21" fill="#334155">60 s TTL, per user</text></g>
+</svg>

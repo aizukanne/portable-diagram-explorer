@@ -5,7 +5,7 @@
 + `docs/superpowers/specs/2026-11-06-portable-diagram-explorer-design.md` (Part 2, **not owner-reviewed**)
 **Plan:** `docs/superpowers/plans/2026-11-06-pde-v1.md`
 **Workplan:** `design/pde-v1-guide/02-workplan.md`
-**Status:** building
+**Status:** built 2026-11-06 — all 11 stories closed; see docs/acceptance-report.md
 
 This guide answers "how" at the file-and-function level. Decision numbers (D#) and measured rules
 (MR#) refer to the design document.

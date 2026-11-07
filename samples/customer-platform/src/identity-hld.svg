@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" font-family="DejaVu Sans, Arial, sans-serif">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker></defs>
+<rect width="100%" height="100%" fill="#ffffff"/>
+<rect x="0" y="0" width="1600" height="78" fill="#0f172a"/>
+<text x="40" y="51" font-size="32" font-weight="700" fill="#ffffff">Identity service — high-level design</text>
+<line x1="400.0" y1="235.0" x2="560.0" y2="235.0" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="400.0" y1="235.0" x2="1060.0" y2="235.0" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="710.0" y1="310.0" x2="710.0" y2="470.0" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="880.0" y1="555.0" x2="1060.0" y2="555.0" stroke="#64748b" stroke-width="3" marker-end="url(#arrow)"/>
+<g><rect x="100" y="160" width="300" height="150" rx="14" fill="#e0f2fe" stroke="#0369a1" stroke-width="3"/>
+<text x="250" y="229" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">Login flow</text>
+<text x="250" y="265" text-anchor="middle" font-size="21" fill="#334155">OIDC with corporate IdP</text></g>
+<g><rect x="560" y="160" width="300" height="150" rx="14" fill="#ede9fe" stroke="#6d28d9" stroke-width="3"/>
+<text x="710" y="229" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">Token service</text>
+<text x="710" y="265" text-anchor="middle" font-size="21" fill="#334155">15-minute access tokens</text></g>
+<g><rect x="540" y="470" width="340" height="170" rx="14" fill="#ede9fe" stroke="#6d28d9" stroke-width="3"/>
+<text x="710" y="549" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">Account association</text>
+<text x="710" y="585" text-anchor="middle" font-size="21" fill="#334155">user ↔ customer accounts</text></g>
+<g><rect x="1060" y="470" width="300" height="170" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="3"/>
+<text x="1210" y="549" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">Directory store</text>
+<text x="1210" y="585" text-anchor="middle" font-size="21" fill="#334155">on the data platform</text></g>
+<g><rect x="1060" y="160" width="300" height="150" rx="14" fill="#fef3c7" stroke="#b45309" stroke-width="3"/>
+<text x="1210" y="229" text-anchor="middle" font-size="30" font-weight="700" fill="#0f172a">Corporate IdP</text>
+<text x="1210" y="265" text-anchor="middle" font-size="21" fill="#334155">external</text></g>
+</svg>

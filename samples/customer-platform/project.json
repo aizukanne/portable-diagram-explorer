@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 1,
+  "projectId": "p-customer-platform",
+  "title": "Customer Platform",
+  "rootDiagramId": "d-overview",
+  "metadata": {
+    "author": "Portable Diagram Explorer sample"
+  },
+  "assets": [
+    {
+      "id": "a-overview",
+      "path": "assets/a-overview-overview.png",
+      "mimeType": "image/png",
+      "width": 1920,
+      "height": 1080
+    },
+    {
+      "id": "a-identity-hld",
+      "path": "assets/a-identity-hld-identity-hld.png",
+      "mimeType": "image/png",
+      "width": 1600,
+      "height": 1000
+    },
+    {
+      "id": "a-account-lld",
+      "path": "assets/a-account-lld-account-lld.png",
+      "mimeType": "image/png",
+      "width": 1600,
+      "height": 1000
+    },
+    {
+      "id": "a-data-platform",
+      "path": "assets/a-data-platform-data-platform.png",
+      "mimeType": "image/png",
+      "width": 1600,
+      "height": 900
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "d-overview",
+      "title": "Customer Platform overview",
+      "assetId": "a-overview",
+      "description": "The customer-facing platform: how requests enter, which services handle them, and where data lives.\nClick a component to drill down.",
+      "hotspots": [
+        {
+          "id": "h-identity",
+          "label": "Identity service",
+          "tooltip": "Authentication and account association",
+          "rect": {
+            "x": 0.583333,
+            "y": 0.111111,
+            "width": 0.177083,
+            "height": 0.157407
+          },
+          "zIndex": 1,
+          "defaultActionId": "act-id-hld",
+          "actions": [
+            {
+              "id": "act-id-hld",
+              "label": "Open HLD",
+              "type": "diagram",
+              "targetDiagramId": "d-identity"
+            },
+            {
+              "id": "act-id-lld",
+              "label": "Open LLD (account association)",
+              "type": "diagram",
+              "targetDiagramId": "d-account-lld"
+            },
+            {
+              "id": "act-id-read",
+              "label": "Read description",
+              "type": "details",
+              "text": "Authenticates users, issues short-lived tokens, and resolves which customer accounts a user may act on.\n\nOwner: Identity team. Availability target: 99.95%."
+            }
+          ]
+        },
+        {
+          "id": "h-billing",
+          "label": "Billing service",
+          "tooltip": "Invoices and payment collection",
+          "rect": {
+            "x": 0.583333,
+            "y": 0.351852,
+            "width": 0.177083,
+            "height": 0.157407
+          },
+          "zIndex": 2,
+          "defaultActionId": null,
+          "actions": [
+            {
+              "id": "act-bill-read",
+              "label": "Read description",
+              "type": "details",
+              "text": "Generates monthly invoices and collects payments through the payment provider.\nNo detailed design is published yet."
+            },
+            {
+              "id": "act-bill-data",
+              "label": "Open data platform",
+              "type": "diagram",
+              "targetDiagramId": "d-data"
+            }
+          ]
+        },
+        {
+          "id": "h-data",
+          "label": "Data platform",
+          "tooltip": "Shared storage and event streams",
+          "rect": {
+            "x": 0.583333,
+            "y": 0.611111,
+            "width": 0.177083,
+            "height": 0.185185
+          },
+          "zIndex": 3,
+          "defaultActionId": "act-data-open",
+          "actions": [
+            {
+              "id": "act-data-open",
+              "label": "Open data platform",
+              "type": "diagram",
+              "targetDiagramId": "d-data"
+            }
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "id": "n-overview",
+          "text": "All traffic enters through the API gateway.\nInternal calls use mutual TLS.",
+          "x": 0.06,
+          "y": 0.72,
+          "width": 0.3
+        }
+      ]
+    },
+    {
+      "id": "d-identity",
+      "title": "Identity service HLD",
+      "assetId": "a-identity-hld",
+      "description": "High-level design of the identity service: login, token issue and account association.",
+      "hotspots": [
+        {
+          "id": "h-login",
+          "label": "Login flow",
+          "tooltip": "How users sign in",
+          "rect": {
+            "x": 0.0625,
+            "y": 0.16,
+            "width": 0.1875,
+            "height": 0.15
+          },
+          "zIndex": 1,
+          "defaultActionId": "act-login-read",
+          "actions": [
+            {
+              "id": "act-login-read",
+              "label": "Read description",
+              "type": "details",
+              "text": "Users sign in through the corporate identity provider (OpenID Connect).\nThe service never stores passwords."
+            }
+          ]
+        },
+        {
+          "id": "h-token",
+          "label": "Token service",
+          "tooltip": "Issues and validates access tokens",
+          "rect": {
+            "x": 0.35,
+            "y": 0.16,
+            "width": 0.1875,
+            "height": 0.15
+          },
+          "zIndex": 2,
+          "defaultActionId": "act-token-read",
+          "actions": [
+            {
+              "id": "act-token-read",
+              "label": "Read description",
+              "type": "details",
+              "text": "Issues signed access tokens valid for 15 minutes and refresh tokens valid for 8 hours."
+            }
+          ]
+        },
+        {
+          "id": "h-assoc",
+          "label": "Account association",
+          "tooltip": "Open the detailed association design",
+          "rect": {
+            "x": 0.3375,
+            "y": 0.47,
+            "width": 0.2125,
+            "height": 0.17
+          },
+          "zIndex": 3,
+          "defaultActionId": "act-assoc-lld",
+          "actions": [
+            {
+              "id": "act-assoc-lld",
+              "label": "Open LLD",
+              "type": "diagram",
+              "targetDiagramId": "d-account-lld"
+            },
+            {
+              "id": "act-assoc-read",
+              "label": "Read description",
+              "type": "details",
+              "text": "Resolves which customer accounts a signed-in user may act on."
+            }
+          ]
+        },
+        {
+          "id": "h-dir",
+          "label": "Directory store",
+          "tooltip": "Where identity data is stored",
+          "rect": {
+            "x": 0.6625,
+            "y": 0.47,
+            "width": 0.1875,
+            "height": 0.17
+          },
+          "zIndex": 4,
+          "defaultActionId": "act-dir-data",
+          "actions": [
+            {
+              "id": "act-dir-data",
+              "label": "Open data platform",
+              "type": "diagram",
+              "targetDiagramId": "d-data"
+            }
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "id": "n-identity",
+          "text": "Account IDs come from the billing system of record.",
+          "x": 0.06,
+          "y": 0.8,
+          "width": 0.4
+        }
+      ]
+    },
+    {
+      "id": "d-account-lld",
+      "title": "Account association LLD",
+      "assetId": "a-account-lld",
+      "description": "Low-level design: tables and the lookup used on every request.",
+      "hotspots": [
+        {
+          "id": "h-users",
+          "label": "users",
+          "tooltip": "One row per signed-in person",
+          "rect": {
+            "x": 0.075,
+            "y": 0.18,
+            "width": 0.225,
+            "height": 0.26
+          },
+          "zIndex": 1,
+          "defaultActionId": "act-users-read",
+          "actions": [
+            {
+              "id": "act-users-read",
+              "label": "Read description",
+              "type": "details",
+              "text": "Columns:\n  user_id   uuid, primary key\n  subject   text, IdP subject, unique\n  email     text"
+            }
+          ]
+        },
+        {
+          "id": "h-links",
+          "label": "account_links",
+          "tooltip": "Which accounts each user may act on",
+          "rect": {
+            "x": 0.3875,
+            "y": 0.18,
+            "width": 0.225,
+            "height": 0.26
+          },
+          "zIndex": 2,
+          "defaultActionId": "act-links-read",
+          "actions": [
+            {
+              "id": "act-links-read",
+              "label": "Read description",
+              "type": "details",
+              "text": "Columns:\n  user_id     uuid → users\n  account_id  text → billing accounts\n  role        viewer | operator | owner"
+            }
+          ]
+        },
+        {
+          "id": "h-cache",
+          "label": "Lookup cache",
+          "tooltip": "Back to the service overview",
+          "rect": {
+            "x": 0.3875,
+            "y": 0.6,
+            "width": 0.225,
+            "height": 0.18
+          },
+          "zIndex": 3,
+          "defaultActionId": "act-cache-back",
+          "actions": [
+            {
+              "id": "act-cache-back",
+              "label": "Open Identity HLD",
+              "type": "diagram",
+              "targetDiagramId": "d-identity"
+            }
+          ]
+        }
+      ],
+      "annotations": []
+    },
+    {
+      "id": "d-data",
+      "title": "Data platform",
+      "assetId": "a-data-platform",
+      "description": "Shared storage used by several services; reachable from more than one diagram.",
+      "hotspots": [
+        {
+          "id": "h-pg",
+          "label": "PostgreSQL cluster",
+          "tooltip": "Relational data",
+          "rect": {
+            "x": 0.075,
+            "y": 0.222222,
+            "width": 0.2375,
+            "height": 0.222222
+          },
+          "zIndex": 1,
+          "defaultActionId": "act-pg-read",
+          "actions": [
+            {
+              "id": "act-pg-read",
+              "label": "Read description",
+              "type": "details",
+              "text": "Primary with two streaming replicas. Point-in-time recovery for 14 days."
+            }
+          ]
+        }
+      ],
+      "annotations": [
+        {
+          "id": "n-data",
+          "text": "Backups run nightly and are restored weekly as a test.",
+          "x": 0.08,
+          "y": 0.68,
+          "width": 0.45
+        }
+      ]
+    }
+  ],
+  "settings": {
+    "tooltipDelayMs": 350,
+    "showHotspotHints": true
+  }
+}
