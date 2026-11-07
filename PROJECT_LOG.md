@@ -26,7 +26,7 @@ exports as one HTML file that runs by double-clicking. Per-session detail lives 
    most affect users: D18, the Escape order; the focus rule in the acceptance report's A07 note;
    D20, alignment review blocking export; D11, the archive limits.
 2. **Run the browser matrix on real hardware:** branded Safari on macOS, Edge on Windows, and A14
-   on a reference laptop. These are open items in the issue tracker; until then those browsers are
-   unproven, not failed.
+   on a reference laptop [#12]. Until then those browsers are unproven, not failed.
 3. **Initial-open time for maximum-size presentations in Firefox and WebKit** (3.4–15.6 s on the
-   test server, against a 5 s target). Measure on real hardware before changing anything.
+   test server, against a 5 s target) [#13]. Measure on real hardware before changing anything.
+4. **Screen-reader and forced-colours verification** [#14].
