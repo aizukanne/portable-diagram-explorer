@@ -1,4 +1,4 @@
-// Editor entry.
-import { buildInfo } from './build-info.js';
+// Editor entry (spec §4 "Author a project"). Runs from file:// with no server.
+import { EditorApp } from './editor/app.js';
 
-document.documentElement.setAttribute('data-pde-version', buildInfo().version || '');
+new EditorApp(document.getElementById('pde-root'));
