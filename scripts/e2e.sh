@@ -12,6 +12,6 @@ trap cleanup EXIT INT TERM
 install='npm ci --no-audit --no-fund >/dev/null'
 [ -f package-lock.json ] || install='npm install --no-audit --no-fund >/dev/null'
 docker run --rm --name "$name" --init --ipc=host \
-  -u "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm -e PDE_A14="${PDE_A14:-}" \
+  -u "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm -e PDE_A14="${PDE_A14:-}" -e PW_CONFIG="${PW_CONFIG:-playwright.config.mjs}" \
   -v "$PWD":/work -w /work "$IMAGE" \
-  bash -c "$install && node build/build.mjs --test >/dev/null && npx playwright test -c playwright.config.mjs \"\$@\"" _ "$@"
+  bash -c "$install && node build/build.mjs --test >/dev/null && npx playwright test -c \"\$PW_CONFIG\" \"\$@\"" _ "$@"

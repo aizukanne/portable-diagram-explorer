@@ -1,0 +1,49 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>SP-1 svg zoom</title>
+<style>
+  html, body { margin: 0; background: #e9edf2; }
+  /* Same structure and CSS as src/ui/renderer.js + src/styles/renderer.css */
+  .pde-viewport { position: relative; overflow: hidden; width: 800px; height: 600px; touch-action: none; background: #e9edf2; }
+  .pde-scene { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+  .pde-image { position: absolute; left: 0; top: 0; display: block; max-width: none; max-height: none;
+    image-orientation: from-image; pointer-events: none; box-shadow: 0 0 0 1px rgba(15, 23, 42, .12); }
+</style>
+<div class="pde-viewport" id="vp"><div class="pde-scene" id="scene"><img class="pde-image" id="img" alt=""></div></div>
+<script>
+  const scene = document.getElementById('scene'), img = document.getElementById('img');
+  window.setT = (tx, ty, s) => { scene.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`; };
+  window.loadImg = (src) => new Promise((res, rej) => {
+    img.onload = () => res({ naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, w: img.width, h: img.height });
+    img.onerror = () => rej(new Error('img error'));
+    img.removeAttribute('width'); img.removeAttribute('height');
+    img.src = src;
+  });
+  // Pan: 60 frames of translate changes; returns the 60 inter-frame deltas (ms).
+  window.pan = (s) => new Promise((res) => {
+    const ts = []; let i = 0;
+    const step = (t) => {
+      ts.push(performance.now());
+      if (i >= 61) { const d = []; for (let k = 1; k < ts.length; k++) d.push(ts[k] - ts[k - 1]); return res(d); }
+      window.setT(-i * 6, -i * 3, s); i++;
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+  // Edge analysis of a PNG data URL: returns max adjacent luminance step and 10-90% transition width along the middle row.
+  window.edge = (dataUrl) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+      const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+      const d = x.getImageData(0, Math.floor(im.height / 2), im.width, 1).data;
+      const L = []; for (let k = 0; k < im.width; k++) L.push(0.299 * d[k * 4] + 0.587 * d[k * 4 + 1] + 0.114 * d[k * 4 + 2]);
+      let maxStep = 0, mid = 0; for (let k = 1; k < L.length; k++) { const s = Math.abs(L[k] - L[k - 1]); if (s > maxStep) { maxStep = s; mid = k; } }
+      const lo = Math.min(...L), hi = Math.max(...L);
+      const range = hi - lo;
+      const trans = L.filter((v) => v > lo + 0.1 * range && v < lo + 0.9 * range).length;
+      res({ maxStep: Math.round(maxStep), range: Math.round(range), transitionPx: trans, width: im.width });
+    };
+    im.src = dataUrl;
+  });
+</script>

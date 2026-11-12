@@ -4,3 +4,5 @@ spike/out/
 test-results/
 playwright-report/
 .cache/
+spike/svg-zoom/out/
+spike/svg-zoom/*.svg
