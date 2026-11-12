@@ -8,19 +8,19 @@
 
 | Story | Issue | Pts | Task | Depends on | Gate |
 |---|---|---|---|---|---|
-| S1 Schema v2, running order field, SVG type, format 2 | #? | 3 | T1 | — | unit green; v1 browser suite 141/141 unchanged |
-| S2 SlideCursor | #? | 1 | T2 | — | 4 unit tests |
-| S3 Editor: running order | #? | 3 | T3 | S1 | A15, A21, I_SAVED_V2 in 3 engines |
-| S4 Viewer: slides, controls, keys, jump list, Home | #? | 5 | T4 | S1, S2 | A16–A18, A20, Review focus 1–2 in 3 engines |
-| S5 Viewer: swipe | #? | 1 | T5 | S4 | A19 in 3 engines |
+| S1 Schema v2, running order field, SVG type, format 2 | #17 | 3 | T1 | — | unit green; v1 browser suite 141/141 unchanged |
+| S2 SlideCursor | #18 | 1 | T2 | — | 4 unit tests |
+| S3 Editor: running order | #19 | 3 | T3 | S1 | A15, A21, I_SAVED_V2 in 3 engines |
+| S4 Viewer: slides, controls, keys, jump list, Home | #20 | 5 | T4 | S1, S2 | A16–A18, A20, Review focus 1–2 in 3 engines |
+| S5 Viewer: swipe | #21 | 1 | T5 | S4 | A19 in 3 engines |
 | SP-1 Spike: SVG zoom and pan | (refs S6) | 1 | T6 | — | REPORT.md with per-engine decision line |
-| S6 SVG import, checks, display, protocol | #? | 5 | T7 | S1, SP-1 | A22–A24, Review focus 3 |
+| S6 SVG import, checks, display, protocol | #22 | 5 | T7 | S1, SP-1 | A22–A24, Review focus 3 |
 | SP-2 Spike: frame READY latency | (refs S7) | 1 | T8 | — | REPORT.md with T |
-| S7 Hosted viewers: nonce, deadline, fallback, notice | #? | 5 | T9 | SP-2, S4 | #16 reproduction guard passes first; A25–A27, Review focus 4 |
-| S8 ZIP clutter and wrapping folder | #? | 2 | T10 | — | A28, Review focus 5 |
-| S9 Release 0.2.0, docs, acceptance report, LG-1 card | #? | 2 | T11 | all | full suite green in 3 engines; A14 re-run recorded |
+| S7 Hosted viewers: nonce, deadline, fallback, notice | #16 | 5 | T9 | SP-2, S4 | #16 reproduction guard passes first; A25–A27, Review focus 4 |
+| S8 ZIP clutter and wrapping folder | #23 | 2 | T10 | — | A28, Review focus 5 |
+| S9 Release 0.2.0, docs, acceptance report, LG-1 card | #24 | 2 | T11 | all | full suite green in 3 engines; A14 re-run recorded |
 
-Issue numbers are filled in when the stories are filed. The plan carries none.
+Issue numbers were assigned when the stories were filed on 2026-11-12. S7 is the existing defect #16, used rather than duplicated (sweep rule). The plan carries none.
 
 ## Critical path
 
