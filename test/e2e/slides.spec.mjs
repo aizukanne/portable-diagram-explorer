@@ -11,6 +11,13 @@ test('A20: no sequence, no slide controls', async ({ page }) => {
   await page.goto(P('viewer-fixture.presentation.html'));
   await expect(page.locator('.pde-slidebar')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Home' })).toHaveCount(0);
+  // A20: slide keys keep their browser defaults when there is no running order.
+  await page.evaluate(() => { window.__prevented = []; window.addEventListener('keydown', (e) => window.__prevented.push([e.key, e.defaultPrevented])); });
+  await page.locator('.pde-root-view rect.pde-hotspot').first().focus();
+  for (const k of ['ArrowRight', 'ArrowLeft', 'PageDown', 'PageUp']) await page.keyboard.press(k);
+  const seen = await page.evaluate(() => window.__prevented.filter(([k]) => /^(Arrow(Left|Right)|Page(Up|Down))$/.test(k)));
+  expect(seen.length).toBe(4);
+  expect(seen.every(([, prevented]) => prevented === false)).toBe(true);
 });
 
 test('A16: buttons and keys step through; ends stop and say so', async ({ page }) => {
@@ -83,4 +90,20 @@ test('Home shows the overview; "Back to slide" closes a drill-down to the curren
   await page.getByRole('button', { name: 'Home' }).click();
   await expect(count(page)).toHaveText('');
   await expect(pageCrumbs(page)).toContainText('Platform overview');
+});
+
+test('R4: at an end, Next/Previous inside a drill-down do nothing — the drill-down stays open', async ({ page }) => {
+  await page.goto(P('slides.presentation.html'));
+  await page.getByRole('button', { name: 'Next' }).click();             // 1 of 3: Loop A (first slide)
+  await page.locator('.pde-root-view rect.pde-hotspot[aria-label="To B"]').click();
+  await expect(page.locator('.pde-modal-layer')).toBeVisible();
+  await page.frameLocator('iframe').getByRole('button', { name: 'To A', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');                               // no slide before the first
+  await page.keyboard.press('PageUp');
+  await page.waitForTimeout(300);
+  await expect(page.locator('.pde-modal-layer')).toBeVisible();
+  await expect(count(page)).toHaveText('1 of 3');
+  await page.keyboard.press('ArrowRight');                              // a real step still works
+  await expect(page.locator('.pde-modal-layer')).toBeHidden();
+  await expect(count(page)).toHaveText('2 of 3');
 });

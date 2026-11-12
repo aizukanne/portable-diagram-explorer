@@ -22,6 +22,9 @@ function send(type, fields) {
 const host = document.body;
 const renderer = new SceneRenderer(host, {
   mode: 'present',
+  // The frame cannot know whether the project has a running order, so it forwards
+  // the slide keys and leaves their browser defaults alone; the parent decides.
+  slideKeys: 'forward',
   onActivate: (hotspotId, mode, anchor) => {
     if (sceneToken) send('ACTIVATE_HOTSPOT', { sceneToken, hotspotId, mode, anchor });
   },

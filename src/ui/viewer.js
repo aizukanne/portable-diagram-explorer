@@ -151,6 +151,7 @@ export class Viewer {
     this.stage = h('main', { class: 'pde-stage' }, this.rootHost, this.rootPanel.el);
     this.rootRenderer = new SceneRenderer(this.rootHost, {
       mode: 'present',
+      slideKeys: this.slides ? 'intercept' : false,
       tooltipDelayMs: this.settings.tooltipDelayMs,
       showHints: this.settings.showHotspotHints,
       onActivate: (id, mode, anchor) => {
@@ -246,6 +247,8 @@ export class Viewer {
   // Moving between slides never leaves a drill-down behind it.
   stepSlide(dir) {
     if (!this.slides || this.menu.isOpen || this.capDialog) return;
+    // At either end the key does nothing: decide before closing a drill-down.
+    if (!(dir > 0 ? this.slides.hasNext : this.slides.hasPrevious)) return;
     if (this.nav.isOpen) this.finishClose(this.nav.close(), { restoreFocus: false });
     const id = dir > 0 ? this.slides.next() : this.slides.previous();
     if (!id) return;
@@ -555,7 +558,7 @@ export class Viewer {
       this.escape();
       return;
     }
-    if (this.slides && !typing && !e.altKey && !e.ctrlKey && !e.metaKey && !this.menu.isOpen && !this.capDialog) {
+    if (this.slides && !typing && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && !this.menu.isOpen && !this.capDialog) {
       const next = e.key === 'ArrowRight' || e.key === 'PageDown';
       const prev = e.key === 'ArrowLeft' || e.key === 'PageUp';
       if ((next || prev) && !this.inControl(e.target)) {
