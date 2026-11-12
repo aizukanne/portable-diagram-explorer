@@ -224,9 +224,11 @@ export class EditorApp {
     const titleOf = (id) => (this.diagram(id) || {}).title || id;
     const refocus = this.seqFocus;
     this.seqFocus = null;
-    clear(this.seqSection).append(h('h2', { id: 'pde-seq-h', text: 'Running order' }));
+    const heading = h('h2', { id: 'pde-seq-h', tabindex: '-1', text: 'Running order' });
+    clear(this.seqSection).append(heading);
     if (!slides.length) {
       this.seqSection.append(h('p', { class: 'pde-muted', text: 'No slides yet. Select a diagram and choose "Add to running order".' }));
+      if (refocus && refocus.heading) heading.focus();
       return;
     }
     const move = (id, to, label = 'Reorder running order') => this.edit((q) => moveInSequence(q, id, to), { label });
@@ -239,7 +241,11 @@ export class EditorApp {
         h('span', { class: 'pde-seq-title', text: titleOf(id) }),
         act('up', 'Move up', () => move(id, i - 1), i === 0),
         act('down', 'Move down', () => move(id, i + 1), i === slides.length - 1),
-        act('remove', 'Remove', () => this.edit((q) => removeFromSequence(q, id), { label: 'Remove slide' })));
+        act('remove', 'Remove', () => {
+          // The row is about to vanish: hand focus to the row that takes its place, or the heading when none is left.
+          this.seqFocus = slides.length === 1 ? { heading: true } : { index: Math.min(i, slides.length - 2), name: 'remove' };
+          this.edit((q) => removeFromSequence(q, id), { label: 'Remove slide' });
+        }));
       li.addEventListener('dragstart', (e) => { this.seqDrag = id; li.classList.add('is-dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); });
       li.addEventListener('dragend', () => { this.seqDrag = null; li.classList.remove('is-dragging'); for (const x of list.children) x.classList.remove('is-over'); });
       li.addEventListener('dragover', (e) => { if (!this.seqDrag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; li.classList.add('is-over'); });
@@ -255,7 +261,7 @@ export class EditorApp {
     });
     this.seqSection.append(list);
     if (refocus) {
-      const row = [...list.children].find((x) => x.dataset.id === refocus.id);
+      const row = refocus.index !== undefined ? list.children[refocus.index] : [...list.children].find((x) => x.dataset.id === refocus.id);
       const btn = row && (row.querySelector(`[data-seq="${refocus.name}"]:not([disabled])`) || row.querySelector('button:not([disabled])'));
       if (btn) btn.focus();
     }
@@ -629,15 +635,11 @@ export class EditorApp {
 
   async saveProject() {
     if (!this.project.diagrams.length) { this.status('Nothing to save yet: add images first.'); return; }
-    // A running order with no slides is invalid and only reachable from a hand-edited file.
-    const dropEmpty = !!(this.project.sequence && this.project.sequence.slides.length === 0);
-    if (dropEmpty) this.edit((q) => { delete q.sequence; }, { label: 'Remove empty running order' });
     const { bytes } = await buildProjectZip(this.project, this.assets.bytes, editorSelfHtml(), buildInfo().version || '');
     const name = `${slug(this.project.title, 60)}.diagram.zip`;
     download(name, bytes, 'application/zip');
     this.store.markSaved();
     const notes = [];
-    if (dropEmpty) notes.push('Removed the empty running order.');
     if (this.migratedFromV1) { notes.push('Saved in the v1.1 format; v1 editors cannot open it.'); this.migratedFromV1 = false; }
     this.status(`Saved ${name}. ${notes.length ? `${notes.join(' ')} ` : ''}Your browser decides where downloads go and cannot confirm the file was kept; check your downloads folder.`);
   }

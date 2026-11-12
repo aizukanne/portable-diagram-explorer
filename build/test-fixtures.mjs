@@ -79,6 +79,7 @@ export async function writeTestFixtures(outDir, presentationTemplate, version, e
   const put = (m, obj) => m.set('project.json', new TextEncoder().encode(JSON.stringify(obj, null, 2)));
   await rezip('missing-asset.diagram.zip', (m) => { m.delete('assets/a-mapping-mapping.png'); });
   await rezip('dangling.diagram.zip', (m) => { const o = pj(); o.title = 'Dangling Platform'; o.diagrams[1].hotspots[0].actions[0].targetDiagramId = 'd-gone'; put(m, o); });
+  await rezip('empty-sequence.diagram.zip', (m) => { const o = pj(); o.schemaVersion = 2; o.sequence = { slides: [] }; put(m, o); });
   await rezip('future.diagram.zip', (m) => { const o = pj(); o.schemaVersion = 9; put(m, o); });
   await rezip('unexpected-entry.diagram.zip', (m) => { m.set('run.sh', new TextEncoder().encode('echo hi')); });
   writeFileSync(`${t}/corrupt.diagram.zip`, new Uint8Array(Buffer.from('PK\u0003\u0004 this archive was cut short')));

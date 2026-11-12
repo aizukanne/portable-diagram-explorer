@@ -66,3 +66,36 @@ test('A21: deleting a slide diagram says so; undo restores its place', async ({ 
   await page.keyboard.press('Control+z');
   await expect(page.locator('.pde-seq-item')).toHaveText([/Shared services/, /Loop B/]);
 });
+
+test('keyboard Remove keeps focus: next row, previous row when last, heading when empty', async ({ page }) => {
+  await open(page); await openFiles(page, T('fixture.diagram.zip'));
+  for (const t of ['Identity HLD', 'Shared services', 'Loop A']) {
+    await diagramBtn(page, t).click();
+    await page.getByRole('button', { name: 'Add to running order' }).click();
+  }
+  const rows = page.locator('.pde-seq-item');
+  const focusedIsRemoveOf = (i) => expect(rows.nth(i).getByRole('button', { name: 'Remove' })).toBeFocused();
+  await rows.nth(1).getByRole('button', { name: 'Remove' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(rows).toHaveText([/Identity HLD/, /Loop A/]);
+  await focusedIsRemoveOf(1);
+  await page.keyboard.press('Enter');
+  await expect(rows).toHaveText([/Identity HLD/]);
+  await focusedIsRemoveOf(0);
+  await page.keyboard.press('Enter');
+  await expect(rows).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Running order' })).toBeFocused();
+});
+
+test('a file with an empty running order is refused loudly on open, naming the field; nothing is changed or saved', async ({ page }) => {
+  await open(page); await openFiles(page, T('fixture.diagram.zip'));
+  await expect(page.locator('.pde-title-input')).toHaveValue('Fixture Platform');
+  await openFiles(page, T('empty-sequence.diagram.zip'));
+  const dlg = page.getByRole('dialog');
+  await expect(dlg).toContainText('This could not be opened');
+  await expect(dlg).toContainText('Nothing was changed');
+  await expect(dlg).toContainText('sequence.slides');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pde-title-input')).toHaveValue('Fixture Platform');
+  await expect(page.locator('.pde-dirty')).toHaveText('Saved');
+});
