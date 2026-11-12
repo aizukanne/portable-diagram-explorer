@@ -8,7 +8,7 @@
 // SVG's size comes from its own text (inspectSvg) and the decode only proves it displays. Object URLs are created lazily and
 // revoked on release; the frame receives data: URLs from a small cache.
 import { newId } from '../core/ids.js';
-import { sniffImage } from '../core/sniff.js';
+import { sniffImage, stripSvgPreamble } from '../core/sniff.js';
 import { bytesToBase64 } from '../core/package.js';
 import { makeIssue } from '../core/schema.js';
 import { MAX_DECODED_PIXELS } from '../core/validate.js';
@@ -56,7 +56,9 @@ export class AssetManager {
     const t = sniffImage(bytes);
     if (!t) {
       const head = new TextDecoder('utf-8').decode(bytes.subarray(0, 4096)).replace(/^\uFEFF/, '').trimStart();
-      if (/^<(?:\?xml|(?:[A-Za-z_][\w.-]*:)?svg)/i.test(head)) {
+      // Almost-SVG: an XML file, or one whose root (after the sniffer's own preamble stripping:
+      // comments, DOCTYPE, declaration) is an <svg>. An HTML page is neither.
+      if (/^<\?xml/i.test(head) || /^<(?:[A-Za-z_][\w.-]*:)?svg/i.test(stripSvgPreamble(bytes))) {
         return { issue: makeIssue('E_SVG_NOT_RECOGNISED', name, head.slice(0, 100),
           'an SVG file whose root element is <svg xmlns="http://www.w3.org/2000/svg" ...>, starting within the first 4096 bytes (any xml declaration, comments and DOCTYPE before it must fit in that)',
           'The file looks like SVG/XML but its root element was not found in the form the importer recognises: an unprefixed <svg> carrying the SVG namespace declaration in its own opening tag. Anything else is not treated as an image.',
