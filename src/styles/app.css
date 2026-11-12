@@ -57,6 +57,14 @@ button { font: inherit; color: inherit; }
 .pde-stage { position: relative; flex: 1; display: flex; min-height: 0; }
 .pde-root-view { flex: 1; min-width: 0; }
 
+/* Slide bar (running order) */
+.pde-slidebar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .4rem .6rem; padding: .4rem .75rem;
+  background: var(--pde-bar); border-top: 1px solid var(--pde-line);
+}
+.pde-slide-count { min-width: 5.5rem; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+.pde-last-slide { color: var(--pde-muted); font-weight: 600; }
+
 /* Side panel */
 .pde-side {
   width: min(360px, 40vw); flex: none; display: flex; flex-direction: column; min-height: 0;

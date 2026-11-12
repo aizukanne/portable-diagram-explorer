@@ -593,6 +593,10 @@ export class SceneRenderer {
       this.opts.onEdit('setRect', { id: hs.id, rect: roundRect(clampRect({ ...hs.rect, x: hs.rect.x + dx, y: hs.rect.y + dy })), coalesce: `nudge:${hs.id}` });
       return;
     }
+    if (this.opts.mode === 'present' && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); this.opts.onKey('Next', e); return; }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); this.opts.onKey('Previous', e); return; }
+    }
     if (e.key === 'Backspace' && this.opts.mode === 'present') { e.preventDefault(); this.opts.onKey('Back', e); return; }
     if (e.key === 'ArrowLeft' && e.altKey) { e.preventDefault(); this.opts.onKey('Back', e); return; }
     if ((e.key === '+' || e.key === '=') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); this.zoomBy(1.25); return; }

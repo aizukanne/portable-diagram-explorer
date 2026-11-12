@@ -7,6 +7,7 @@ import { SceneRenderer } from './renderer.js';
 import { FrameBridge } from './bridge.js';
 import { ComponentMenu } from './menu.js';
 import { NavStack, HISTORY_CAP } from '../core/navigation.js';
+import { SlideCursor } from '../core/slides.js';
 
 const DEFAULT_SETTINGS = { tooltipDelayMs: 350, showHotspotHints: true };
 
@@ -112,8 +113,13 @@ export class Viewer {
     this.modalView = null;
     this.modalSelected = null;
     this.originHotspotId = null;
+    // The running order (spec §3): null when the project has no sequence, and then
+    // no slide control is built at all.
+    this.slides = project.sequence ? new SlideCursor(project.sequence.slides, project.rootDiagramId) : null;
+    this.pageDiagramId = project.rootDiagramId;
     this.build();
-    this.showRoot();
+    this.showSlide(this.pageDiagramId);
+    this.syncSlidebar();
   }
 
   // ---- layout --------------------------------------------------------------
@@ -125,11 +131,13 @@ export class Viewer {
     this.rootListBtn = button('Components', () => this.togglePanel('root', 'list'), { icon: '☰', attrs: { 'aria-expanded': 'false' } });
     this.rootAboutBtn = button('About this diagram', () => this.togglePanel('root', 'about'), { icon: 'ⓘ', attrs: { 'aria-expanded': 'false' } });
     this.fsBtn = fsOk ? button('Full screen', () => this.toggleFullscreen(), { icon: '⛶' }) : null;
+    this.homeBtn = this.slides ? button('Home', () => this.goHome(), { icon: '⌂', title: 'Show the overview' }) : null;
     this.rootTitle = h('span', { class: 'pde-crumb-current', 'aria-current': 'page' });
     this.toolbar = h('header', { class: 'pde-toolbar' },
-      h('h1', { class: 'pde-project-title', text: p.title }),
+      h('h1', { class: 'pde-project-title', tabindex: '-1', text: p.title }),
       h('nav', { class: 'pde-crumbs', 'aria-label': 'Location' }, h('ol', {}, h('li', {}, this.rootTitle))),
       h('div', { class: 'pde-tools' },
+        this.homeBtn,
         this.rootListBtn, this.rootAboutBtn,
         h('span', { class: 'pde-sep', 'aria-hidden': 'true' }),
         button('Zoom out', () => this.rootRenderer.zoomBy(0.8), { icon: '−', iconOnly: true }),
@@ -151,6 +159,8 @@ export class Viewer {
       },
       onKey: (key) => this.onKey(key),
     });
+
+    this.slidebar = this.slides ? this.buildSlidebar() : null;
 
     // Modal
     this.modalTitle = h('h2', { class: 'pde-modal-title', id: 'pde-modal-title', tabindex: '-1' });
@@ -174,7 +184,7 @@ export class Viewer {
           button('Fit', () => this.bridge.command('fit'), { icon: '⤢' }),
           button('Zoom in', () => this.bridge.command('zoomIn'), { icon: '+', iconOnly: true }),
           h('span', { class: 'pde-sep', 'aria-hidden': 'true' }),
-          button('Overview', () => this.closeModal(), { icon: '⌂' }),
+          (this.overviewBtn = button('Overview', () => this.closeModal(), { icon: '⌂' })),
           button('Close', () => this.closeModal(), { cls: 'pde-primary', icon: '✕' }))),
       h('div', { class: 'pde-modal-body' }, this.frameHost, this.modalPanel.el),
       sentinel('end'));
@@ -182,7 +192,7 @@ export class Viewer {
     this.live = h('div', { class: 'pde-sr-only', role: 'status', 'aria-live': 'polite' });
     this.overlay = h('div', { class: 'pde-overlay-layer' });
     this.app = h('div', { class: ['pde-app', 'pde-viewer', this.embedded && 'pde-embedded'] },
-      this.toolbar, this.stage, this.modalLayer, this.overlay, this.live);
+      this.toolbar, this.stage, this.slidebar, this.modalLayer, this.overlay, this.live);
     this.menu = new ComponentMenu(this.overlay);
     this.root.append(this.app);
 
@@ -194,19 +204,97 @@ export class Viewer {
 
   // ---- root ----------------------------------------------------------------
 
+  // The project overview; the diagram shown on the page is pageDiagram().
   rootDiagram() { return this.byId.get(this.project.rootDiagramId); }
+  pageDiagram() { return this.byId.get(this.pageDiagramId); }
 
-  showRoot() {
-    const d = this.rootDiagram();
+  showSlide(diagramId) {
+    this.pageDiagramId = diagramId;
+    const d = this.pageDiagram();
     this.rootTitle.textContent = d.title;
     this.rootAboutBtn.hidden = !d.description;
-    this.rootRenderer.setScene(sceneOf(this.project, d), this.assets.url(d.assetId)).catch((e) => this.announce(e.message));
+    this.rootPanel.close();
+    return this.rootRenderer.setScene(sceneOf(this.project, d), this.assets.url(d.assetId)).catch((e) => this.announce(e.message));
+  }
+
+  // ---- slides --------------------------------------------------------------
+
+  buildSlidebar() {
+    this.prevBtn = button('Previous', () => this.previousSlide(), { icon: '◀' });
+    this.nextBtn = button('Next', () => this.nextSlide(), { icon: '▶' });
+    this.slideCount = h('span', { class: 'pde-slide-count' });
+    this.lastSlide = h('span', { class: 'pde-last-slide', hidden: true, text: 'Last slide' });
+    this.slidesBtn = button('Slides', () => this.openSlidesMenu(), { icon: '☰', attrs: { 'aria-haspopup': 'menu' } });
+    return h('div', { class: 'pde-slidebar', role: 'group', 'aria-label': 'Slides' },
+      this.prevBtn, this.slideCount, this.nextBtn, this.slidesBtn, this.lastSlide);
+  }
+
+  slideTitle(id) { return this.byId.get(id).title; }
+
+  syncSlidebar() {
+    const c = this.slides;
+    if (!c) return;
+    this.prevBtn.disabled = !c.hasPrevious;
+    this.nextBtn.disabled = !c.hasNext;
+    this.slideCount.textContent = c.label();
+    this.lastSlide.hidden = !c.isLast;
+    const title = this.pageDiagram().title;
+    this.rootTitle.textContent = c.index === null ? title : `Slide ${c.index + 1} of ${c.count} › ${title}`;
+    this.overviewBtn.querySelector('.pde-btn-label').textContent = this.pageDiagramId !== this.project.rootDiagramId ? 'Back to slide' : 'Overview';
+  }
+
+  // Moving between slides never leaves a drill-down behind it.
+  stepSlide(dir) {
+    if (!this.slides || this.menu.isOpen || this.capDialog) return;
+    if (this.nav.isOpen) this.finishClose(this.nav.close(), { restoreFocus: false });
+    const id = dir > 0 ? this.slides.next() : this.slides.previous();
+    if (!id) return;
+    this.showSlide(id);
+    this.syncSlidebar();
+    this.app.querySelector('h1.pde-project-title').focus();
+    this.announce(`Slide ${this.slides.label()}: ${this.slideTitle(id)}`);
+  }
+
+  nextSlide() { this.stepSlide(1); }
+  previousSlide() { this.stepSlide(-1); }
+
+  goHome() {
+    if (!this.slides || this.menu.isOpen || this.capDialog) return;
+    if (this.nav.isOpen) this.finishClose(this.nav.close(), { restoreFocus: false });
+    this.slides.home();
+    this.showSlide(this.project.rootDiagramId);
+    this.syncSlidebar();
+    this.announce(`Overview: ${this.slideTitle(this.project.rootDiagramId)}`);
+  }
+
+  openSlidesMenu() {
+    const r = this.slidesBtn.getBoundingClientRect();
+    this.menu.open({
+      title: 'Slides',
+      anchor: { x: Math.round(r.left), y: window.innerHeight }, // the menu clamps itself above the bottom edge
+      items: this.project.sequence.slides.map((id, i) => ({
+        label: `${i + 1}. ${this.slideTitle(id)}`,
+        current: this.slides.index === i,
+        onSelect: () => this.jumpToSlide(i),
+      })),
+      onClose: ({ restoreFocus }) => { if (restoreFocus) this.slidesBtn.focus(); },
+    });
+  }
+
+  jumpToSlide(i) {
+    if (this.nav.isOpen) this.finishClose(this.nav.close(), { restoreFocus: false });
+    const id = this.slides.jump(i);
+    if (!id) return;
+    this.showSlide(id);
+    this.syncSlidebar();
+    this.app.querySelector('h1.pde-project-title').focus();
+    this.announce(`Slide ${this.slides.label()}: ${this.slideTitle(id)}`);
   }
 
   // ---- context helpers -----------------------------------------------------
 
   contextDiagram(ctx) {
-    if (ctx === 'root') return this.rootDiagram();
+    if (ctx === 'root') return this.pageDiagram();
     const cur = this.nav.current();
     return cur ? this.byId.get(cur.diagramId) : null;
   }
@@ -313,6 +401,7 @@ export class Viewer {
     }
     this.toolbar.inert = true;
     this.stage.inert = true;
+    if (this.slidebar) this.slidebar.inert = true;
     this.rootRenderer.hideTooltip();
     this.modalLayer.hidden = false;
   }
@@ -343,7 +432,7 @@ export class Viewer {
   renderCrumbs() {
     clear(this.crumbs);
     const trail = this.nav.breadcrumbs();
-    this.crumbs.append(h('li', {}, button(this.rootDiagram().title, () => this.closeModal(), { cls: 'pde-crumb', title: 'Return to the overview' })));
+    this.crumbs.append(h('li', {}, button(this.pageCrumbLabel(), () => this.closeModal(), { cls: 'pde-crumb', title: this.pageDiagramId === this.project.rootDiagramId ? 'Return to the overview' : 'Return to the slide' })));
     trail.forEach((c, i) => {
       const d = this.byId.get(c.diagramId);
       const last = i === trail.length - 1;
@@ -353,6 +442,12 @@ export class Viewer {
     });
     const lastEl = this.crumbs.lastElementChild;
     if (lastEl && lastEl.scrollIntoView) lastEl.scrollIntoView({ block: 'nearest', inline: 'end' });
+  }
+
+  pageCrumbLabel() {
+    const c = this.slides;
+    const t = this.pageDiagram().title;
+    return c && c.index !== null ? `Slide ${c.index + 1} of ${c.count} › ${t}` : t;
   }
 
   back() {
@@ -371,15 +466,16 @@ export class Viewer {
     this.finishClose(this.nav.close());
   }
 
-  finishClose(overview) {
+  finishClose(overview, { restoreFocus = true } = {}) {
     this.menu.close({ restoreFocus: false });
     this.closeCapDialog();
     this.modalPanel.close();
     this.toolbar.inert = false;
     this.stage.inert = false;
-    if (overview) {
+    if (this.slidebar) this.slidebar.inert = false;
+    if (overview && restoreFocus) {
       this.rootRenderer.setView(overview.viewport, { silent: true });
-      if (overview.details) this.rootPanel.showDetails(this.rootDiagram(), overview.details);
+      if (overview.details) this.rootPanel.showDetails(this.pageDiagram(), overview.details);
     }
     // Take window focus back from the frame, and focus the originating hotspot
     // while the frame is still shown: hiding a focused frame first leaves focus on
@@ -387,9 +483,9 @@ export class Viewer {
     window.focus();
     const focusId = this.originHotspotId || (overview && overview.selectedHotspotId);
     this.originHotspotId = null;
-    if (!(focusId && this.rootRenderer.focusHotspot(focusId, { quiet: true }))) this.rootRenderer.focusEdge('first');
+    if (restoreFocus && !(focusId && this.rootRenderer.focusHotspot(focusId, { quiet: true }))) this.rootRenderer.focusEdge('first');
     this.modalLayer.hidden = true;
-    this.announce('Overview');
+    if (restoreFocus) this.announce(this.pageDiagramId === this.project.rootDiagramId ? 'Overview' : `Slide: ${this.pageDiagram().title}`);
   }
 
   showCapDialog() {
@@ -443,7 +539,12 @@ export class Viewer {
   onKey(key) {
     if (key === 'Escape') this.escape();
     else if (key === 'Back') this.back();
+    else if (key === 'Next') this.nextSlide();
+    else if (key === 'Previous') this.previousSlide();
   }
+
+  // Arrow keys already mean something inside a menu or on a slider-like control.
+  inControl(el) { return !!(el && el.closest && el.closest('[role=menu], [role=slider], [role=listbox]')); }
 
   onDocumentKey(e) {
     if (e.defaultPrevented) return;
@@ -453,6 +554,15 @@ export class Viewer {
       e.preventDefault();
       this.escape();
       return;
+    }
+    if (this.slides && !typing && !e.altKey && !e.ctrlKey && !e.metaKey && !this.menu.isOpen && !this.capDialog) {
+      const next = e.key === 'ArrowRight' || e.key === 'PageDown';
+      const prev = e.key === 'ArrowLeft' || e.key === 'PageUp';
+      if ((next || prev) && !this.inControl(e.target)) {
+        e.preventDefault();
+        if (next) this.nextSlide(); else this.previousSlide();
+        return;
+      }
     }
     if (!this.nav.isOpen || typing) return;
     if ((e.key === 'Backspace' && !this.menu.isOpen) || (e.key === 'ArrowLeft' && e.altKey)) {

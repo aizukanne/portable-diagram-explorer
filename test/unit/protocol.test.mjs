@@ -36,3 +36,9 @@ test('frame accepts a well-formed render and rejects a non-data image URL or ext
   assert.equal(validateParentMessage({ ...render, image: { dataUrl: 'data:image/svg+xml;base64,AAAA' } }, ctx).ok, false);
   assert.equal(validateParentMessage({ ...render, scene: { ...scene, actions: [] } }, ctx).ok, false);
 });
+
+test('KEY accepts Next and Previous, still rejects unknown keys', () => {
+  const C = ctx.channel;
+  const ok = (key) => validateChildMessage({ pde: 1, channel: C, seq: 9, type: 'KEY', key }, { channel: C, lastSeq: 0, sceneToken: null }).ok;
+  assert.equal(ok('Next'), true); assert.equal(ok('Previous'), true); assert.equal(ok('ArrowRight'), false);
+});

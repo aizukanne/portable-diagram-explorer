@@ -40,7 +40,7 @@ const CHILD_TYPES = {
     fields: ['sceneToken', 'viewport', 'selectedHotspotId'], token: true,
     check: (m) => isView(m.viewport) && (m.selectedHotspotId === null || isId(m.selectedHotspotId)),
   },
-  KEY: { fields: ['key'], token: false, check: (m) => ['Escape', 'Back', 'Fit', 'ZoomIn', 'ZoomOut', 'FocusOut'].includes(m.key) },
+  KEY: { fields: ['key'], token: false, check: (m) => ['Escape', 'Back', 'Next', 'Previous', 'Fit', 'ZoomIn', 'ZoomOut', 'FocusOut'].includes(m.key) },
 };
 
 const isScene = (s) => exactKeys(s, ['title', 'width', 'height', 'hotspots', 'annotations'])

@@ -14,14 +14,14 @@ export class ComponentMenu {
 
   get isOpen() { return !this.el.hidden; }
 
-  // items: [{ label, onSelect }]; anchor: { x, y } in page (viewport) coordinates.
+  // items: [{ label, onSelect, current? }]; anchor: { x, y } in page (viewport) coordinates.
   open({ title, items, anchor, onClose }) {
     this.el.replaceChildren();
     this.el.setAttribute('aria-label', title);
     this.el.append(h('div', { class: 'pde-menu-title', 'aria-hidden': 'true', text: title }));
     this.items = items.map((it) => {
       const b = h('button', {
-        type: 'button', role: 'menuitem', class: 'pde-menu-item', tabindex: '-1', text: it.label,
+        type: 'button', role: 'menuitem', class: 'pde-menu-item', tabindex: '-1', text: it.label, 'aria-current': it.current ? 'true' : undefined,
         on: { click: () => { this.close({ restoreFocus: false }); it.onSelect(); } },
       });
       this.el.append(b);
