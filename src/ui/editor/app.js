@@ -357,6 +357,7 @@ export class EditorApp {
     const asset = p.assets.find((a) => a.id === d.assetId);
     const isRoot = d.id === p.rootDiagramId;
     const list = h('ul', { class: 'pde-mini-list' }, d.hotspots.map((x) => h('li', {}, button(x.label, () => this.select('hotspot', x.id), { cls: 'pde-link' }))));
+    const notes = h('ul', { class: 'pde-mini-list' }, d.annotations.map((n) => h('li', {}, button(noteLabel(n.text), () => this.select('annotation', n.id), { cls: 'pde-link' }))));
     return h('div', {},
       h('h2', { text: 'Diagram' }),
       this.field('Title', d.title, (v) => this.edit((q) => updateDiagram(q, d.id, { title: v }), { label: 'Rename diagram', coalesce: `dtitle:${d.id}`, quiet: true }), { key: 'diagram-title', max: '200' }),
@@ -368,6 +369,8 @@ export class EditorApp {
           button(isRoot ? 'This is the overview' : 'Set as overview', () => this.edit((q) => setRoot(q, d.id), { label: 'Set overview' }), { icon: '★', disabled: isRoot }))),
       h('div', { class: 'pde-section' }, h('h3', { text: `Hotspots on this diagram (${d.hotspots.length})` }),
         d.hotspots.length ? list : h('p', { class: 'pde-muted', text: 'Choose "Add hotspot" and drag over a component on the image.' })),
+      h('div', { class: 'pde-section' }, h('h3', { text: `Notes on this diagram (${d.annotations.length})` }),
+        d.annotations.length ? notes : h('p', { class: 'pde-muted', text: 'Choose "Add note" and click where the note should go.' })),
       h('div', { class: 'pde-section' }, button('Delete diagram…', () => this.deleteDiagram(d.id), { cls: 'pde-danger', icon: '✖' })),
       h('h2', { text: 'Project' }), this.projectSettings());
   }
@@ -664,4 +667,12 @@ export class EditorApp {
 
 function findRect(p, dId, hId) {
   return p.diagrams.find((d) => d.id === dId).hotspots.find((x) => x.id === hId).rect;
+}
+
+// The inspector names a note by its first line, shortened, so a list of notes stays readable.
+function noteLabel(text) {
+  const first = String(text).split('\n').find((l) => l.trim()) || '';
+  const t = first.trim();
+  if (!t) return '(empty note)';
+  return t.length > 40 ? `${t.slice(0, 39)}…` : t;
 }

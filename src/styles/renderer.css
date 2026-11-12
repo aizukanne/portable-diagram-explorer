@@ -22,7 +22,11 @@
 }
 .pde-mode-edit .pde-annotation { pointer-events: auto; cursor: move; }
 .pde-mode-edit .pde-annotation.is-selected { outline: 2px solid #dc2626; outline-offset: 1px; }
-.pde-hotspots { position: absolute; left: 0; top: 0; overflow: visible; }
+/* The layer spans the whole image above the notes, so it must not take clicks itself: only
+   hotspots and their handles do. Otherwise notes can never be clicked (issue #15). Where a note
+   lies under a hotspot, the hotspot wins; the note stays reachable from the inspector's list. */
+.pde-hotspots { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.pde-hotspot, .pde-handle { pointer-events: visible; }
 .pde-hotspot {
   fill: rgba(37, 99, 235, .10); stroke: #1d4ed8; stroke-width: 2px; vector-effect: non-scaling-stroke;
   cursor: pointer; outline: none;
