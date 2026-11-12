@@ -6,3 +6,4 @@ playwright-report/
 .cache/
 spike/svg-zoom/out/
 spike/svg-zoom/*.svg
+spike/frame-ready/out/
