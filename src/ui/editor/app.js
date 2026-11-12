@@ -635,6 +635,8 @@ export class EditorApp {
     const errs = r.issues.filter((i) => i.severity === 'error');
     this.status(`Opened "${r.project.title}" from ${r.source}${errs.length ? ` with ${errs.length} problem(s) to fix before export` : ''}.`);
     if (errs.length) await this.showIssues();
+    const notes = r.issues.filter((i) => i.severity === 'warning');
+    if (notes.length) await this.showIssueDialog('Opened, with notes', 'The project opened. These parts of the file were skipped or changed on the way in.', notes);
   }
 
   async saveProject() {

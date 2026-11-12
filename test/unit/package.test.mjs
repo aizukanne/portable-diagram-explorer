@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { png } from '../helpers/png.mjs';
-import { buildProjectZip, readProjectZip, readLooseFiles, buildPresentationHtml, readPresentationHtml, assignAssetPaths } from '../../src/core/package.js';
+import { buildProjectZip, readProjectZip, isOsClutter, readLooseFiles, buildPresentationHtml, readPresentationHtml, assignAssetPaths } from '../../src/core/package.js';
 import { writeZip, readZip } from '../../src/core/zip.js';
 import { measureEnvelope } from '../../src/core/envelope.js';
 import { sniffImage, sniffFileKind, slug } from '../../src/core/sniff.js';
@@ -221,4 +221,50 @@ test('a presentation with an SVG whose root tag follows a long preamble opens in
   const r = readPresentationData(block, { decodeAssets: false });
   assert.ok(r.project);
   assert.deepEqual(r.issues.filter((i) => i.severity === 'error'), []);
+});
+
+async function fixtureZipEntries() {
+  const { project, assets } = fixture();
+  const { bytes } = await buildProjectZip(project, assets, '<!doctype html><title>e</title>', '0.1.0');
+  return [...(await readZip(bytes))].map(([name, b]) => ({ name, bytes: b }));
+}
+
+test('OS clutter is skipped and named; other unexpected entries are still errors (A28)', async () => {
+  const base = await fixtureZipEntries();
+  const zip = await writeZip([...base, ...['__MACOSX/._project.json', '.DS_Store', 'assets/.DS_Store', 'Thumbs.db', 'DESKTOP.INI'].map((n) => ({ name: n, bytes: new Uint8Array(1) }))]);
+  const r = await readProjectZip(zip);
+  assert.ok(r.project);
+  const w = r.issues.find((i) => i.code === 'W_PKG_OS_FILES_SKIPPED');
+  for (const n of ['__MACOSX/._project.json', '.DS_Store', 'assets/.DS_Store', 'Thumbs.db', 'DESKTOP.INI']) assert.ok(w.received.includes(n));
+  const bad = await readProjectZip(await writeZip([...base, { name: 'run.exe', bytes: new Uint8Array(1) }, { name: '.DS_Store', bytes: new Uint8Array(1) }]));
+  assert.equal(bad.project, null);
+  assert.ok(bad.issues.some((i) => i.code === 'E_PKG_UNEXPECTED_ENTRY' && i.path === 'run.exe'));
+  assert.ok(bad.issues.some((i) => i.code === 'W_PKG_OS_FILES_SKIPPED'));
+});
+
+test('a single wrapping folder is stripped and reported; Finder AppleDouble too (Review focus 5)', async () => {
+  const base = await fixtureZipEntries();
+  const zip = await writeZip([...base.map((e) => ({ ...e, name: `My Project/${e.name}` })), { name: '__MACOSX/My Project/._project.json', bytes: new Uint8Array(1) }]);
+  const r = await readProjectZip(zip);
+  assert.ok(r.project);
+  assert.match(r.issues.find((i) => i.code === 'W_PKG_OS_FILES_SKIPPED').received, /wrapping folder "My Project\/" removed/);
+});
+
+test('no stripping when a top-level project.json sits beside the folder; errors name original paths', async () => {
+  const base = await fixtureZipEntries();
+  const zip = await writeZip([...base, { name: 'copy/project.json', bytes: base[0].bytes }]);
+  const r = await readProjectZip(zip);
+  assert.equal(r.project, null);
+  assert.ok(r.issues.some((i) => i.code === 'E_PKG_UNEXPECTED_ENTRY' && i.path === 'copy/project.json'));
+});
+
+test('stripping cannot make a wrapped entry look allowed; clutter classifier matches the spec', async () => {
+  const base = await fixtureZipEntries();
+  const wrapped = base.map((e) => ({ ...e, name: `W/${e.name}` }));
+  const r = await readProjectZip(await writeZip([...wrapped, { name: 'W/W/project.json', bytes: base[0].bytes }, { name: 'W/assets/sub/x.png', bytes: new Uint8Array(1) }]));
+  assert.equal(r.project, null);
+  assert.ok(r.issues.some((i) => i.code === 'E_PKG_UNEXPECTED_ENTRY' && i.path === 'W/W/project.json'));
+  assert.ok(r.issues.some((i) => i.code === 'E_PKG_UNEXPECTED_ENTRY' && i.path === 'W/assets/sub/x.png'));
+  for (const n of ['__MACOSX/a', 'a/__MACOSX/b', '.DS_Store', 'x/.DS_Store', 'THUMBS.DB', 'a/Desktop.ini']) assert.ok(isOsClutter(n), n);
+  for (const n of ['project.json', 'assets/a.png', 'DS_Store', 'my.DS_Store', 'thumbs.db.png']) assert.ok(!isOsClutter(n), n);
 });

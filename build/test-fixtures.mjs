@@ -83,6 +83,15 @@ export async function writeTestFixtures(outDir, presentationTemplate, version, e
   await rezip('empty-sequence.diagram.zip', (m) => { const o = pj(); o.schemaVersion = 2; o.sequence = { slides: [] }; put(m, o); });
   await rezip('future.diagram.zip', (m) => { const o = pj(); o.schemaVersion = 9; put(m, o); });
   await rezip('unexpected-entry.diagram.zip', (m) => { m.set('run.sh', new TextEncoder().encode('echo hi')); });
+  const junk = new Uint8Array([0, 5, 22, 7]);
+  await rezip('finder-rezip.diagram.zip', (m) => {
+    const wrapped = [...m].map(([n, b]) => [`Fixture Platform/${n}`, b]);
+    m.clear();
+    for (const [n, b] of wrapped) m.set(n, b);
+    m.set('__MACOSX/Fixture Platform/._project.json', junk);
+    m.set('Fixture Platform/.DS_Store', junk);
+  });
+  await rezip('windows-rezip.diagram.zip', (m) => { m.set('Thumbs.db', junk); m.set('assets/desktop.ini', junk); });
   writeFileSync(`${t}/corrupt.diagram.zip`, new Uint8Array(Buffer.from('PK\u0003\u0004 this archive was cut short')));
   mkdirSync(`${t}/images`, { recursive: true });
   writeFileSync(`${t}/images/overview.png`, png(1200, 700, [230, 240, 252], [box(0.1, 0.2, 0.3, 0.3, [80, 120, 200]), box(0.6, 0.2, 0.3, 0.3, [200, 120, 80])]));

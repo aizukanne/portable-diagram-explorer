@@ -129,6 +129,13 @@ function admit(project, getBytes, issues) {
   return assets;
 }
 
+// Names an operating system adds when a folder is compressed again (spec 5.5).
+export function isOsClutter(name) {
+  if (/(^|\/)__MACOSX\//.test(name)) return true;
+  const base = name.slice(name.lastIndexOf('/') + 1);
+  return base === '.DS_Store' || /^(thumbs\.db|desktop\.ini)$/i.test(base);
+}
+
 export async function readProjectZip(bytes) {
   const issues = [];
   let files;
@@ -141,14 +148,46 @@ export async function readProjectZip(bytes) {
     }
     throw e;
   }
+  // Operating-system clutter is classified first, by name only: it is never decoded or used.
+  const skipped = [];
+  const kept = new Map(); // name as read -> bytes
+  for (const [name, b] of files) {
+    if (isOsClutter(name)) skipped.push(name); else kept.set(name, b);
+  }
+  // A single wrapping folder (name/project.json, as made by compressing a folder) is removed only when
+  // EVERY remaining entry sits under that one folder and project.json is directly inside it.
+  let wrapper = null;
+  const names = [...kept.keys()];
+  const seg = names.length ? names[0].split('/')[0] : '';
+  if (seg && names.every((n) => n.startsWith(`${seg}/`)) && kept.has(`${seg}/project.json`)) wrapper = seg;
+  files = new Map();
+  const original = new Map(); // name used below -> name in the archive
+  for (const [name, b] of kept) {
+    const used = wrapper ? name.slice(wrapper.length + 1) : name;
+    files.set(used, b);
+    original.set(used, name);
+  }
+  if (skipped.length || wrapper) {
+    const received = skipped.join(', ') + (wrapper ? `${skipped.length ? '; ' : ''}wrapping folder "${wrapper}/" removed` : '');
+    // The list is the message: set verbatim, not through preview() (which JSON-quotes and cuts at 120 characters).
+    const warn = makeIssue('W_PKG_OS_FILES_SKIPPED', '(archive)', '',
+      'an archive holding only project.json, README.txt, editor.html and assets/ (no operating-system files, no wrapping folder)',
+      'Operating systems add these files when a package is compressed again; they carry nothing this application uses.',
+      'Nothing to do: they were skipped and the project opened. Save the project again from the editor to get a clean archive.', 'warning');
+    warn.received = received;
+    issues.push(warn);
+  }
+  let unexpected = false;
   for (const name of files.keys()) {
     const ok = name === 'project.json' || name === 'README.txt' || name === 'editor.html' || /^assets\/[^/]+$/.test(name);
     if (!ok) {
-      issues.push(makeIssue('E_PKG_UNEXPECTED_ENTRY', name, name, 'only project.json, README.txt, editor.html and files directly inside assets/',
-        'Unexpected files could carry content this application must not run or silently drop.', `Remove "${name}" from the archive, or save the project again from the editor.`));
+      unexpected = true;
+      const orig = original.get(name);
+      issues.push(makeIssue('E_PKG_UNEXPECTED_ENTRY', orig, orig, 'only project.json, README.txt, editor.html and files directly inside assets/',
+        'Unexpected files could carry content this application must not run or silently drop.', `Remove "${orig}" from the archive, or save the project again from the editor.`));
     }
   }
-  if (issues.length) return { project: null, assets: new Map(), issues };
+  if (unexpected) return { project: null, assets: new Map(), issues };
   if (!files.has('project.json')) {
     issues.push(makeIssue('E_PKG_NO_PROJECT', 'project.json', '(absent)', 'a project.json at the top of the archive',
       'project.json holds the diagrams, hotspots and links; without it there is no project.', 'Choose a .diagram.zip saved by the editor (not a folder of images).'));
@@ -157,7 +196,7 @@ export async function readProjectZip(bytes) {
   const text = decodeUtf8(files.get('project.json'), 'project.json', issues);
   if (text === null) return { project: null, assets: new Map(), issues };
   const parsed = parseProjectJson(text);
-  if (!parsed.project) return { project: null, assets: new Map(), issues: parsed.issues };
+  if (!parsed.project) return { project: null, assets: new Map(), issues: [...issues, ...parsed.issues] };
   const project = parsed.project;
   const referenced = new Set();
   const assets = admit(project, (a) => {
@@ -173,7 +212,7 @@ export async function readProjectZip(bytes) {
   if (!assets) return { project: null, assets: new Map(), issues };
   for (const name of files.keys()) {
     if (name.startsWith('assets/') && !referenced.has(name)) {
-      issues.push(makeIssue('W_PKG_EXTRA_FILE', name, name, 'only images listed in project.json', 'Files no asset refers to are ignored.', 'Remove the file, or ignore this if it is intentional.', 'warning'));
+      issues.push(makeIssue('W_PKG_EXTRA_FILE', original.get(name), original.get(name), 'only images listed in project.json', 'Files no asset refers to are ignored.', 'Remove the file, or ignore this if it is intentional.', 'warning'));
     }
   }
   return { project, assets, issues, migratedFrom: parsed.migratedFrom };

@@ -78,6 +78,19 @@ test('A02: the editor inside a saved package opens it again (continue editing on
   await expect(page.locator('.pde-title-input')).toHaveValue('Fixture Platform');
 });
 
+for (const file of ['finder-rezip.diagram.zip', 'windows-rezip.diagram.zip']) {
+  test(`${file} opens, with the skipped operating-system files named`, async ({ page }) => {
+    await open(page);
+    await openFiles(page, T(file));
+    const dlg = page.getByRole('dialog', { name: 'Opened, with notes' });
+    await expect(dlg).toBeVisible();
+    await expect(dlg.locator('.pde-issue-code').first()).toHaveText('W_PKG_OS_FILES_SKIPPED');
+    await expect(dlg).toContainText(file.startsWith('finder') ? '.DS_Store' : 'Thumbs.db');
+    await dlg.getByRole('button', { name: 'Close' }).click();
+    await expect(page.locator('.pde-title-input')).toHaveValue('Fixture Platform');
+  });
+}
+
 for (const [file, code, keepTitle] of [
   ['missing-asset.diagram.zip', 'E_PKG_MISSING_ASSET', true],
   ['future.diagram.zip', 'E_FUTURE_SCHEMA', true],
