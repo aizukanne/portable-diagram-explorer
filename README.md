@@ -4,7 +4,7 @@ Turn existing architecture diagram images into an interactive, drill-down presen
 that anyone can open **offline, by double-clicking one file**. No installation, server, account,
 internet connection or browser setting is needed.
 
-You import your PNG, JPEG or WebP diagrams, draw clickable regions over components, and say
+You import your PNG, JPEG, WebP or SVG diagrams, draw clickable regions over components, and say
 what each component does when clicked: open a more detailed diagram, show a description, or
 offer a menu (for example *Open HLD*, *Open LLD*, *Read description*). Your images are never
 changed. The editor only adds navigation and notes on top of them.
@@ -19,6 +19,11 @@ changed. The editor only adds navigation and notes on top of them.
 
 A ready-made example is in `dist/sample/` after building: `customer-platform.presentation.html`
 (present it) and `customer-platform.diagram.zip` (open it in the editor).
+
+**Version 0.2.0** adds a running order (step through diagrams with Next and Previous), SVG images,
+a way for presentations to work inside SharePoint-style previews, and tolerance for packages that
+were unzipped and zipped again. Each is described below. Files saved by 0.2.0 use a newer format
+that the 0.1.0 editor refuses with a clear message; 0.2.0 opens 0.1.0 files unchanged.
 
 ## What the files are
 
@@ -59,6 +64,71 @@ than guessed between.
 - Diagrams can link to each other freely, including in cycles. After 64 drill-downs in a row you
   are asked to go back or reset, so history stays bounded.
 
+## Running order (presenting in sequence)
+
+By default a presentation is a web of links: you start at the overview and click through. A **running
+order** adds a second way in: a list of diagrams shown one after another, the way slides are, whether
+or not any component links to them. A project with no running order behaves exactly as in version 1.
+
+- **Next** and **Previous** (the buttons at the bottom, **Right Arrow** / **Page Down** and **Left
+  Arrow** / **Page Up**) step through the order. The counter reads "3 of 7" and the breadcrumb shows
+  the slide's title. On the last slide Next does nothing and a "Last slide" marker is shown; on the first
+  slide Previous does nothing.
+- The **jump list** names every slide in order, marks the current one, and works from the keyboard.
+- **Home** (in the toolbar) shows the overview. Inside a drill-down window the **Overview** button reads
+  **Back to slide** when the window was opened from a slide.
+- From inside a drill-down window, Next or Previous closes the window and continues from the last slide
+  you were on. Focus moves to the new slide's heading, and screen readers announce "Slide N of M: title".
+- On a touch screen, swipe left or right to change slide, but only when the diagram is not zoomed in.
+  When zoomed in, the same gesture pans.
+
+In the editor, select a diagram and choose **Add to running order**. The running-order panel lists the
+slides; reorder them by dragging or with **Move up** / **Move down**, and remove them from the same panel.
+Each change is one undo step. Deleting a diagram that is in the order removes it from the order, the
+delete confirmation says so, and undo restores both. The overview is not added automatically.
+
+The sample (`customer-platform.presentation.html`) has a three-slide running order.
+
+## SVG diagrams
+
+SVG files import like images and are shown through an image element, so a script, event handler, embedded
+page or external link inside an SVG **never runs and never makes a network request**; the file's bytes are
+stored unchanged. If an SVG contains such parts, the import shows a warning naming what will not run or
+load. The editor reads the displayed size from the SVG's `width` and `height`, or from its `viewBox`. If it
+has neither, it is refused with a message naming the missing attributes and how to add them. When one of the
+two sides is a percentage (for example `width="100%" height="400"` with a `viewBox`), the absolute side is
+kept and the other is worked out from the `viewBox` proportions. A file that looks like an SVG but cannot be
+read as one is refused with its own message. SVG files up to 20 MiB are accepted, with a warning above
+200,000 drawn elements, because very large drawings pan slowly. Hotspots stay aligned at any zoom. At the
+zoom levels tested (up to 1600%), the drawing stayed sharp; sharpness on high-density screens is not yet
+verified.
+
+## Presentations inside SharePoint and other host pages
+
+Some sites (SharePoint and OneDrive previews are the known case) show an HTML file inside their own page and
+apply their own script rules to it. In version 1 that left drill-down windows empty. Version 0.2.0 does two
+things:
+
+1. If the host stamps its scripts with a one-time code (a nonce), the presentation passes that code to the
+   sealed frame that draws drill-downs, so the host's rules accept it. Isolation is unchanged.
+2. If the frame still has not started after 4 seconds, drill-downs are drawn in the page itself instead, with
+   slightly reduced isolation. Author text is still inserted as plain text only, and SVG is still shown as an
+   image.
+
+Whenever a presentation runs inside another page, a notice says so and suggests downloading the file and
+opening it in a browser. If the in-page fallback is running, the notice adds that drill-downs are shown with
+reduced isolation. **Dismiss** hides the notice for that visit (it comes back if the fallback starts later). The notice
+never appears when the file is opened directly or in the editor's own preview.
+
+**This is tested against a model of SharePoint's rules, not against SharePoint.** The owner's own check is
+described in `docs/lg1-sharepoint-check.md` and has not been run yet.
+
+## Re-zipped packages
+
+A `.diagram.zip` that was unpacked and packed again on macOS (with `__MACOSX/` folders and `.DS_Store`) or Windows (with
+`Thumbs.db` and `desktop.ini`) opens. A dialog, "Opened, with notes", lists every skipped file by name. A single wrapping
+folder around the package's files is removed. Any other unexpected file is still refused.
+
 ## Authoring
 
 - **Diagrams** (left): thumbnails, the ★ overview marker, and how many links point to each
@@ -83,12 +153,13 @@ than guessed between.
 - The **problems** button lists every error and warning. Each one names the field, the value
   found, what is accepted, why it matters, and how to fix it, with a **Go to** link.
 
-## Limits (version 1)
+## Limits
 
 | | Limit |
 |---|---|
-| Image formats | PNG, JPEG, WebP. SVG and PDF are not imported. |
+| Image formats | PNG, JPEG, WebP, SVG (20 MiB limit for SVG). PDF is not imported. |
 | Image size | Warning above 4096 px on a side; refused above 100 million pixels |
+| Running order | 1 to 500 slides, each diagram at most once |
 | Tested envelope | 50 diagrams, 1,000 hotspots, 100 hotspots per diagram, 50 MiB of images. Larger exports are allowed after a warning. Measurements are in `docs/acceptance-report.md`. |
 | Hotspot shape | Rectangles |
 | Text | Plain text; line breaks are kept and nothing is interpreted as HTML |
@@ -102,10 +173,12 @@ than guessed between.
 - Drill-down views render in one sandboxed iframe (scripts only: no same-origin access,
   navigation, pop-ups or forms). The parent accepts a message from it only on the correct
   channel, in sequence, for the scene currently shown, and naming a component of that scene.
+  The one exception: if a host page stops the frame from starting, drill-downs are drawn in the page
+  after 4 seconds, with reduced isolation, and a notice says so.
 - Imported packages are treated as untrusted:
   - unexpected files, path traversal, duplicate names, oversized and over-compressed archives are
     refused by name;
-  - image types are checked from the bytes;
+  - image types are checked from the bytes (an SVG must really be an SVG with a size);
   - an `editor.html` inside an imported package is never used.
 - Hiding the editor (sending only the presentation) is a convenience, **not** protection: the
   presentation contains the full project data and images.
@@ -119,7 +192,7 @@ it has been built and tested with Node 24 (host) and Node 26 (inside the Playwri
 npm run build      # dist/editor.html, dist/presentation-template.html, dist/sample/*, schema
 npm test           # unit tests (Node's built-in runner)
 scripts/e2e.sh     # browser tests in Chromium, Firefox and WebKit via the pinned Playwright container
-PDE_A14=1 scripts/e2e.sh test/e2e/a14   # the A14 envelope measurement (slow)
+PDE_A14=1 scripts/e2e.sh test/e2e/a14-envelope.spec.mjs --workers=1   # the A14 envelope measurement (slow; one worker, or the engines race to build the same file)
 scripts/render-sample.sh                # re-render the sample images from samples/customer-platform/layout.mjs
 ```
 
@@ -128,4 +201,6 @@ protocol), `src/ui/` (renderer, frame, viewer, editor), `schema/project.schema.j
 from `src/core/project-schema.js`), `docs/` (specification, design, plan, acceptance report).
 
 The project format is documented by `schema/project.schema.json` and section 9 of the
-specification.
+specification. Version 0.2.0 writes `schemaVersion` 2 (adds the optional `sequence` and the SVG type) and reads
+1 and 2; a version 1 file is saved as version 2 on first save, and the editor says so. Design for 0.2.0:
+`docs/superpowers/specs/2026-11-12-pde-v1.1-design.md`.

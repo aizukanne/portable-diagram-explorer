@@ -7,3 +7,5 @@ playwright-report/
 spike/svg-zoom/out/
 spike/svg-zoom/*.svg
 spike/frame-ready/out/
+spike/a29/v010-editor.html
+spike/a29/out/

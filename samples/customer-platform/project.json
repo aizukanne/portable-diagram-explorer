@@ -1,8 +1,15 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "projectId": "p-customer-platform",
   "title": "Customer Platform",
   "rootDiagramId": "d-overview",
+  "sequence": {
+    "slides": [
+      "d-overview",
+      "d-identity",
+      "d-account-lld"
+    ]
+  },
   "metadata": {
     "author": "Portable Diagram Explorer sample"
   },
