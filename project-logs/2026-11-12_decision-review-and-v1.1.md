@@ -30,6 +30,18 @@
   independent agent raised 12 questions; all were settled without an owner ruling (§5.8). One real gap
   was found: the frame protocol's image check rejects SVG.
 
+- **Owner approved the v1.1 design** ("Approved, write the plan").
+- **Plan, guide and workplan written and committed together:**
+  - plan: `docs/superpowers/plans/2026-11-12-pde-v1.1.md` (11 tasks, two of them spikes);
+  - guide and workplan: `design/pde-v1.1-guide/`.
+  The self-review fixed four things: a navigation test that would have hung, two tests that could not
+  tell right from wrong (now discriminating fixtures), a SharePoint harness built on a wrong assumption
+  about how browser security policies combine (replaced by a hash-only host model), and a missing check
+  for A29 (now run against the real v1 editor).
+- **Milestone "PDE v1.1" created; story issues filed:** S1 #17, S2 #18, S3 #19, S4 #20, S5 #21, S6 #22,
+  S8 #23, S9 #24. S7 is the existing #16, retitled and moved to the milestone instead of being filed
+  twice. The sweep is recorded in every issue.
+
 ## Key decisions
 
 - The two amendments are behaviour changes, so each gets an issue and a regression test. They are not
