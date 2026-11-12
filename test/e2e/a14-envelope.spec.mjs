@@ -3,7 +3,7 @@
 // into docs/acceptance-report.md and advertised limits follow them.
 import { test, expect } from '@playwright/test';
 import { pathToFileURL } from 'node:url';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, statSync, renameSync, unlinkSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 import path from 'node:path';
@@ -23,8 +23,22 @@ function noisePng(w, h) {
   return new Uint8Array(Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 1 })), chunk('IEND', Buffer.alloc(0))]));
 }
 
+// The envelope is built once and shared by every worker. A file already on disk is only
+// reused if it is complete: the build writes to a private temp path and renames it into
+// place (atomic), and a sidecar records the exact byte length the file must have, so a
+// truncated file left by a killed run, or one another worker is still writing, is never
+// trusted.
+const META = path.join(OUT, 'envelope.meta.json');
+function envelopeIsValid() {
+  try {
+    if (!existsSync(FILE) || !existsSync(META) || !existsSync(path.join(OUT, 'image-bytes.json'))) return false;
+    const { size } = JSON.parse(readFileSync(META, 'utf8'));
+    return Number.isInteger(size) && size > 0 && statSync(FILE).size === size;
+  } catch { return false; }
+}
+
 function makeEnvelope() {
-  if (existsSync(FILE)) return;
+  if (envelopeIsValid()) return;
   mkdirSync(OUT, { recursive: true });
   // Spec §12 envelope: 50 diagrams, 1000 hotspots, <= 50 MiB of compressed images.
   // Random pixels do not compress, so 690 x 500 RGB is ~0.99 MiB per image.
@@ -44,8 +58,20 @@ function makeEnvelope() {
     project.diagrams.push({ id: `d-${i}`, title: `Diagram ${i}`, assetId: `a-${i}`, hotspots, annotations: [] });
   }
   const tpl = readFileSync('dist/presentation-template.html', 'utf8');
-  writeFileSync(FILE, buildPresentationHtml(tpl, project, assets, 'a14'));
-  writeFileSync(path.join(OUT, 'image-bytes.json'), JSON.stringify({ bytes: [...assets.values()].reduce((n, b) => n + b.length, 0) }));
+  const html = buildPresentationHtml(tpl, project, assets, 'a14');
+  const tag = `${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+  const tmp = (f) => `${f}.${tag}`;
+  try {
+    writeFileSync(tmp(FILE), html);
+    writeFileSync(tmp(META), JSON.stringify({ size: statSync(tmp(FILE)).size }));
+    writeFileSync(tmp(path.join(OUT, 'image-bytes.json')), JSON.stringify({ bytes: [...assets.values()].reduce((n, b) => n + b.length, 0) }));
+    // Sidecars first, the page last: a reader that sees a valid page sees valid sidecars.
+    renameSync(tmp(path.join(OUT, 'image-bytes.json')), path.join(OUT, 'image-bytes.json'));
+    renameSync(tmp(META), META);
+    renameSync(tmp(FILE), FILE);
+  } finally {
+    for (const f of [FILE, META, path.join(OUT, 'image-bytes.json')]) { try { unlinkSync(tmp(f)); } catch { /* already renamed */ } }
+  }
 }
 
 test('A14: maximum-envelope presentation — recorded measurements', async ({ page, browserName }) => {

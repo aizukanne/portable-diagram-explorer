@@ -166,7 +166,7 @@ Each row names the test that checks it (all in `test/e2e/` unless stated otherwi
 | A24 | Hotspots line up on an SVG at 25%, 100% and 1600% zoom | `svg.spec` "A24: hotspots line up on an SVG at 25%, 100% and 1600%" | Pass. |
 | A25 | In a host page that stamps scripts with a nonce (the H1 model), drill-downs render in the sealed frame | `hosted.spec` "A25 (H1 model): host nonce is passed on; drill-down renders in the sealed frame", "Review focus 4: a malformed nonce is ignored…" | Pass against our model of the host. **Not SharePoint.** |
 | A26 | When the frame cannot start, drill-downs render in the page within the deadline and the notice says so | `hosted.spec` "A26: frame cannot start… in-page fallback within the deadline, notice says so", "A26b…", "A26c: a notice dismissed earlier comes back…", "bridge: a healthy frame does not trigger onStartFailed" | Pass against our model of the host. **Not SharePoint.** |
-| A27 | The notice appears whenever the presentation is inside another page, can be dismissed, and does not appear on `file://` or in the editor preview (the reduced-isolation sentence would still appear if the in-page fallback ever ran there) | `hosted.spec` "A27: no notice on file:// or in the editor preview; Dismiss hides it", "Dismiss inside the open drill-down (keyboard) keeps focus in the dialog" | Pass. |
+| A27 | The notice appears whenever the presentation is inside another page, can be dismissed, and does not appear on `file://`; in the editor preview the hosting sentence is hidden, but the reduced-isolation sentence is still shown if the in-page fallback ever runs there (unit-tested in `host-nonce.test.mjs`; the fallback does not run in the preview in practice) | `hosted.spec` "A27: no notice on file:// or in the editor preview; Dismiss hides it", "Dismiss inside the open drill-down (keyboard) keeps focus in the dialog" | Pass. |
 | A28 | A package re-zipped on macOS or Windows opens; every skipped file is named in a warning; other unexpected entries are still refused | `editor.spec` "finder-rezip.diagram.zip opens, with the skipped operating-system files named" and the Windows equivalent, "A09: unexpected-entry…"; `test/unit/package.test.mjs` "OS clutter is skipped and named… (A28)" | Pass. |
 | A29 | A version 1 file opens in 1.1 unchanged; a 1.1 file opened in the version 1 editor gets version 1's own "newer version" error, no crash and no loss | First half: `editor.spec` "A02" (a version 1 fixture opens and saves with only the version changed) and `test/unit/package.test.mjs` (version 1 packages and presentations read as version 2). Second half: the check below, against the real version 1 editor. | Pass. |
 | LG-1 | In the owner's SharePoint preview, drill-downs show their diagrams and the notice appears; the console capture and the path taken (H1 or fallback) are recorded | `docs/lg1-sharepoint-check.md` (owner's step card) | **Not run. Awaiting the owner.** Issue #16 stays open until the capture is posted. |
@@ -211,12 +211,13 @@ same host, run once with the three engines one after another. Version 1's two ru
 | Zoom frame time, median / 95th percentile | smooth | **16 / 40 ms** (v1: 17 / 37) | **22 / 80 ms** (v1: 39 / 149) | **63 / 195 ms** (v1: 128 / 496) |
 | JavaScript heap | none | 242 MiB used (v1: 242) | not exposed | not exposed |
 
-An earlier attempt ran the three engines in parallel and is not used for the table above, for two reasons. Its
-Chromium and Firefox numbers agreed with this table (Chromium open 2.6 s, navigation median 55 ms; Firefox open 1.8 s,
-navigation median 37 ms), but its WebKit run failed: all three workers race to build the same 66 MiB file, and WebKit
-opened it before it was complete and showed nothing for five minutes. That is a defect in the test's setup, not in the
-product; running the test with `--workers=1`, as above, avoids it, and the README command now says so. It was not
-fixed in the test in this release.
+An earlier attempt ran the three engines in parallel and is not used for the table above. Its Chromium and Firefox
+numbers agreed with this table (Chromium open 2.6 s, navigation median 55 ms; Firefox open 1.8 s, navigation median
+37 ms), but its WebKit run failed: the three workers raced to build the same 66 MiB file, and WebKit opened it before
+it was complete and showed nothing for five minutes. That was a defect in the test's setup, not in the product. It is
+fixed in the test: the file is now written to a private temporary path and renamed into place atomically, and an
+existing file is reused only if its length matches a recorded size (otherwise it is rebuilt). The parallel re-run is
+recorded in the final-fix report.
 
 **Verdict: no slowdown.** Every 0.2.0 figure sits inside the range version 1 recorded between its own two runs,
 or is better than both. Nothing is worse than version 1's worse run. Version 1 recorded differences of up to 2x

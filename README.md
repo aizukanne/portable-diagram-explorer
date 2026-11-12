@@ -118,7 +118,8 @@ things:
 Whenever a presentation runs inside another page, a notice says so and suggests downloading the file and
 opening it in a browser. If the in-page fallback is running, the notice adds that drill-downs are shown with
 reduced isolation. **Dismiss** hides the notice for that visit (it comes back if the fallback starts later). The notice
-does not appear when the file is opened directly or in the editor's own preview (the reduced-isolation sentence would still appear if the in-page fallback ever ran there).
+does not appear when the file is opened directly. In the editor's own preview the hosting sentence is hidden, but if the
+in-page fallback ever ran there the reduced-isolation sentence would still be shown.
 
 **This is tested against a model of SharePoint's rules, not against SharePoint.** The owner's own check is
 described in `docs/lg1-sharepoint-check.md` and has not been run yet.
@@ -192,7 +193,7 @@ it has been built and tested with Node 24 (host) and Node 26 (inside the Playwri
 npm run build      # dist/editor.html, dist/presentation-template.html, dist/sample/*, schema
 npm test           # unit tests (Node's built-in runner)
 scripts/e2e.sh     # browser tests in Chromium, Firefox and WebKit via the pinned Playwright container
-PDE_A14=1 scripts/e2e.sh test/e2e/a14-envelope.spec.mjs --workers=1   # the A14 envelope measurement (slow; one worker, or the engines race to build the same file)
+PDE_A14=1 scripts/e2e.sh test/e2e/a14-envelope.spec.mjs   # the A14 envelope measurement (slow; the 66 MiB file is built once, atomically, and shared by the engines)
 scripts/render-sample.sh                # re-render the sample images from samples/customer-platform/layout.mjs
 ```
 

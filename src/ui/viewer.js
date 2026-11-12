@@ -27,11 +27,12 @@ export function isHostedWindow(win) {
 }
 
 // The one decision about the notice: its text, or '' for none. The editor's own
-// preview (embedded) never shows it. If the fallback happened while not hosted, the
-// base sentence would be false, so only the isolation sentence shows.
+// preview (embedded) never shows the base hosting sentence, but if the in-page fallback
+// ran there, the reduced-isolation sentence is still shown: isolation must never be
+// reduced silently. If the fallback happened while not hosted, the base sentence would be
+// false, so only the isolation sentence shows.
 export function hostNoticeText({ embedded, hosted, fallback }) {
-  if (embedded) return '';
-  return [hosted ? NOTICE_BASE : '', fallback ? NOTICE_FALLBACK : ''].filter(Boolean).join(' ');
+  return [hosted && !embedded ? NOTICE_BASE : '', fallback ? NOTICE_FALLBACK : ''].filter(Boolean).join(' ');
 }
 
 export function sceneOf(project, diagram) {

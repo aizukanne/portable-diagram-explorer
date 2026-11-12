@@ -55,8 +55,13 @@ test('a template without exactly two nonce marks is refused', () => {
   assert.throws(() => frameSrcdoc('<script__NONCE_ATTR__></script>', '', 'C'), /exactly two nonce marks/);
 });
 
-test('the notice decision: the editor preview (embedded) never shows it', () => {
-  for (const hosted of [true, false]) for (const fallback of [true, false]) assert.equal(hostNoticeText({ embedded: true, hosted, fallback }), '');
+test('the notice decision: the editor preview (embedded) hides the hosting sentence, but never hides reduced isolation', () => {
+  for (const hosted of [true, false]) {
+    assert.equal(hostNoticeText({ embedded: true, hosted, fallback: false }), '');
+    const t = hostNoticeText({ embedded: true, hosted, fallback: true });
+    assert.match(t, /reduced isolation/);
+    assert.doesNotMatch(t, /download the file|another site/);
+  }
 });
 
 test('the notice decision: hosted, fallback, both, neither', () => {
