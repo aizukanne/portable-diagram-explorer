@@ -185,3 +185,13 @@ button { font: inherit; color: inherit; }
   .pde-editor-body { grid-template-columns: 200px minmax(0, 1fr); }
   .pde-inspector { grid-column: 1 / -1; max-height: 40vh; border-left: 0; border-top: 1px solid var(--pde-line); }
 }
+
+.pde-seq { display: grid; gap: .3rem; padding-bottom: .5rem; border-bottom: 1px solid var(--pde-line); }
+.pde-seq-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+.pde-seq-item { display: flex; align-items: center; gap: .3rem; padding: .2rem .3rem; border: 1px solid var(--pde-line); border-radius: var(--pde-radius); background: #fff; cursor: grab; }
+.pde-seq-item.is-dragging { opacity: .5; }
+.pde-seq-item.is-over { border-color: var(--pde-accent); box-shadow: 0 -2px 0 var(--pde-accent); }
+.pde-seq-handle { color: var(--pde-muted); }
+.pde-seq-n { color: var(--pde-muted); font-variant-numeric: tabular-nums; }
+.pde-seq-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pde-slide-badge { color: var(--pde-accent); font-weight: 600; }

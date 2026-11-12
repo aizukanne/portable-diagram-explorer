@@ -12,7 +12,7 @@ import {
   emptyProject, addDiagramFromAsset, updateDiagram, setRoot, referencesTo, removeDiagram, replaceAsset,
   markAlignmentReviewed, addHotspot, duplicateHotspot, deleteHotspot, updateHotspot, setRect, moveZ,
   addAction, updateAction, removeAction, moveAction, setDefaultAction, addAnnotation, updateAnnotation,
-  deleteAnnotation, updateProjectMeta,
+  deleteAnnotation, updateProjectMeta, addToSequence, removeFromSequence, moveInSequence, sequenceIndex,
 } from './ops.js';
 import { validateProject } from '../../core/validate.js';
 import { buildProjectZip, buildPresentationHtml } from '../../core/package.js';
@@ -100,7 +100,9 @@ export class EditorApp {
     this.search = h('input', { type: 'search', class: 'pde-search', placeholder: 'Filter diagrams', 'aria-label': 'Filter diagrams' });
     this.search.addEventListener('input', () => this.renderSidebar());
     this.diagramList = h('ul', { class: 'pde-diagram-list', 'aria-label': 'Diagrams' });
+    this.seqSection = h('section', { class: 'pde-seq', 'aria-labelledby': 'pde-seq-h' });
     this.sidebar = h('aside', { class: 'pde-sidebar', 'aria-label': 'Diagrams' },
+      this.seqSection,
       h('div', { class: 'pde-sidebar-head' }, h('h2', { text: 'Diagrams' }), button('Add images…', () => this.inputs.add.click(), { icon: '+' })),
       this.search, this.diagramList);
 
@@ -190,6 +192,7 @@ export class EditorApp {
     const p = this.project;
     const q = this.search.value.trim().toLowerCase();
     const refCount = (id) => referencesTo(p, id).length;
+    this.renderSequence();
     clear(this.diagramList);
     for (const d of p.diagrams) {
       if (q && !d.title.toLowerCase().includes(q)) continue;
@@ -205,12 +208,57 @@ export class EditorApp {
           h('span', { class: 'pde-diagram-title', text: d.title }),
           h('span', { class: 'pde-diagram-sub' },
             isRoot ? h('span', { class: 'pde-root-badge', text: '★ Overview' }) : null,
+            sequenceIndex(p, d.id) >= 0 ? h('span', { class: 'pde-slide-badge', text: `Slide ${sequenceIndex(p, d.id) + 1}` }) : null,
             h('span', { text: `${d.hotspots.length} hotspot${d.hotspots.length === 1 ? '' : 's'}` }),
             h('span', { text: n ? `linked ${n}×` : 'not linked' }),
             d.alignmentReviewRequired ? h('span', { class: 'pde-warn-badge', text: 'review alignment' }) : null))));
       this.diagramList.append(item);
     }
     if (!p.diagrams.length) this.diagramList.append(h('li', { class: 'pde-muted', text: 'No diagrams yet.' }));
+  }
+
+  // The running order: the ordered slides a presenter steps through. Every change is one undo step.
+  renderSequence() {
+    const p = this.project;
+    const slides = p.sequence ? p.sequence.slides : [];
+    const titleOf = (id) => (this.diagram(id) || {}).title || id;
+    const refocus = this.seqFocus;
+    this.seqFocus = null;
+    clear(this.seqSection).append(h('h2', { id: 'pde-seq-h', text: 'Running order' }));
+    if (!slides.length) {
+      this.seqSection.append(h('p', { class: 'pde-muted', text: 'No slides yet. Select a diagram and choose "Add to running order".' }));
+      return;
+    }
+    const move = (id, to, label = 'Reorder running order') => this.edit((q) => moveInSequence(q, id, to), { label });
+    const list = h('ol', { class: 'pde-seq-list', 'aria-label': 'Running order' });
+    slides.forEach((id, i) => {
+      const act = (name, text, onClick, disabled) => button(text, () => { this.seqFocus = { id, name }; onClick(); }, { iconOnly: true, icon: name === 'up' ? '↑' : name === 'down' ? '↓' : '✕', disabled, attrs: { 'data-seq': name } });
+      const li = h('li', { class: 'pde-seq-item', draggable: 'true', dataset: { id } },
+        h('span', { class: 'pde-seq-handle', 'aria-hidden': 'true', text: '⠿' }),
+        h('span', { class: 'pde-seq-n', text: `${i + 1}.` }),
+        h('span', { class: 'pde-seq-title', text: titleOf(id) }),
+        act('up', 'Move up', () => move(id, i - 1), i === 0),
+        act('down', 'Move down', () => move(id, i + 1), i === slides.length - 1),
+        act('remove', 'Remove', () => this.edit((q) => removeFromSequence(q, id), { label: 'Remove slide' })));
+      li.addEventListener('dragstart', (e) => { this.seqDrag = id; li.classList.add('is-dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); });
+      li.addEventListener('dragend', () => { this.seqDrag = null; li.classList.remove('is-dragging'); for (const x of list.children) x.classList.remove('is-over'); });
+      li.addEventListener('dragover', (e) => { if (!this.seqDrag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; li.classList.add('is-over'); });
+      li.addEventListener('dragleave', () => li.classList.remove('is-over'));
+      li.addEventListener('drop', (e) => {
+        e.preventDefault();
+        li.classList.remove('is-over');
+        const from = this.seqDrag;
+        this.seqDrag = null;
+        if (from && from !== id) move(from, i);
+      });
+      list.append(li);
+    });
+    this.seqSection.append(list);
+    if (refocus) {
+      const row = [...list.children].find((x) => x.dataset.id === refocus.id);
+      const btn = row && (row.querySelector(`[data-seq="${refocus.name}"]:not([disabled])`) || row.querySelector('button:not([disabled])'));
+      if (btn) btn.focus();
+    }
   }
 
   showDiagram(id, { select } = {}) {
@@ -356,6 +404,7 @@ export class EditorApp {
     const p = this.project;
     const asset = p.assets.find((a) => a.id === d.assetId);
     const isRoot = d.id === p.rootDiagramId;
+    const inSeq = sequenceIndex(p, d.id) >= 0;
     const list = h('ul', { class: 'pde-mini-list' }, d.hotspots.map((x) => h('li', {}, button(x.label, () => this.select('hotspot', x.id), { cls: 'pde-link' }))));
     const notes = h('ul', { class: 'pde-mini-list' }, d.annotations.map((n) => h('li', {}, button(noteLabel(n.text), () => this.select('annotation', n.id), { cls: 'pde-link' }))));
     return h('div', {},
@@ -371,6 +420,9 @@ export class EditorApp {
         d.hotspots.length ? list : h('p', { class: 'pde-muted', text: 'Choose "Add hotspot" and drag over a component on the image.' })),
       h('div', { class: 'pde-section' }, h('h3', { text: `Notes on this diagram (${d.annotations.length})` }),
         d.annotations.length ? notes : h('p', { class: 'pde-muted', text: 'Choose "Add note" and click where the note should go.' })),
+      h('div', { class: 'pde-section' }, inSeq
+        ? button('Remove from running order', () => this.edit((q) => removeFromSequence(q, d.id), { label: 'Remove slide' }), { icon: '−' })
+        : button('Add to running order', () => this.edit((q) => addToSequence(q, d.id), { label: 'Add slide' }), { icon: '+' })),
       h('div', { class: 'pde-section' }, button('Delete diagram…', () => this.deleteDiagram(d.id), { cls: 'pde-danger', icon: '✖' })),
       h('h2', { text: 'Project' }), this.projectSettings());
   }
@@ -497,6 +549,8 @@ export class EditorApp {
     const refs = referencesTo(p, id).filter((r) => r.diagramId !== id);
     const others = p.diagrams.filter((x) => x.id !== id);
     const body = [h('p', { text: `Delete "${d.title}" and its ${d.hotspots.length} hotspot(s) and ${d.annotations.length} note(s)? Its image file is not affected. You can undo this.` })];
+    const slideAt = sequenceIndex(p, id);
+    if (slideAt >= 0) body.push(h('p', { text: `It is slide ${slideAt + 1} of ${p.sequence.slides.length} in the running order and will be removed from it.` }));
     let retarget = null;
     let mode = null;
     if (refs.length) {
@@ -542,6 +596,7 @@ export class EditorApp {
     this.assets.clear();
     this.renderedDiagram = null;
     this.store.reset(emptyProject());
+    this.migratedFromV1 = false;
     this.status('New project.');
   }
 
@@ -566,6 +621,7 @@ export class EditorApp {
     this.renderedDiagram = null;
     this.store.reset(r.project);
     this.store.markSaved();
+    this.migratedFromV1 = r.migratedFrom === 1;
     const errs = r.issues.filter((i) => i.severity === 'error');
     this.status(`Opened "${r.project.title}" from ${r.source}${errs.length ? ` with ${errs.length} problem(s) to fix before export` : ''}.`);
     if (errs.length) await this.showIssues();
@@ -573,11 +629,17 @@ export class EditorApp {
 
   async saveProject() {
     if (!this.project.diagrams.length) { this.status('Nothing to save yet: add images first.'); return; }
+    // A running order with no slides is invalid and only reachable from a hand-edited file.
+    const dropEmpty = !!(this.project.sequence && this.project.sequence.slides.length === 0);
+    if (dropEmpty) this.edit((q) => { delete q.sequence; }, { label: 'Remove empty running order' });
     const { bytes } = await buildProjectZip(this.project, this.assets.bytes, editorSelfHtml(), buildInfo().version || '');
     const name = `${slug(this.project.title, 60)}.diagram.zip`;
     download(name, bytes, 'application/zip');
     this.store.markSaved();
-    this.status(`Saved ${name}. Your browser decides where downloads go and cannot confirm the file was kept; check your downloads folder.`);
+    const notes = [];
+    if (dropEmpty) notes.push('Removed the empty running order.');
+    if (this.migratedFromV1) { notes.push('Saved in the v1.1 format; v1 editors cannot open it.'); this.migratedFromV1 = false; }
+    this.status(`Saved ${name}. ${notes.length ? `${notes.join(' ')} ` : ''}Your browser decides where downloads go and cannot confirm the file was kept; check your downloads folder.`);
   }
 
   async exportPresentation() {

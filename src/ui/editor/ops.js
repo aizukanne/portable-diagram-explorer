@@ -85,6 +85,7 @@ export function removeDiagram(p, dId, decision = {}, newRoot) {
     }
   }
   p.diagrams = p.diagrams.filter((d) => d.id !== dId);
+  if (p.sequence && p.sequence.slides.includes(dId)) removeFromSequence(p, dId);
   if (p.rootDiagramId === dId) {
     if (newRoot) findDiagram(p, newRoot);
     p.rootDiagramId = newRoot || (p.diagrams[0] ? p.diagrams[0].id : '');
@@ -235,4 +236,34 @@ export function updateProjectMeta(p, patch) {
   if (patch.title !== undefined) p.title = patch.title;
   if (patch.tooltipDelayMs !== undefined) p.settings = { ...(p.settings || {}), tooltipDelayMs: patch.tooltipDelayMs };
   if (patch.showHotspotHints !== undefined) p.settings = { ...(p.settings || {}), showHotspotHints: patch.showHotspotHints };
+}
+
+// ---- running order (spec: project.sequence.slides) ---------------------------
+// An empty running order is invalid, so the last removal deletes `sequence` itself.
+
+export function sequenceIndex(p, dId) {
+  return p.sequence ? p.sequence.slides.indexOf(dId) : -1;
+}
+
+export function addToSequence(p, dId) {
+  findDiagram(p, dId);
+  if (sequenceIndex(p, dId) >= 0) throw new Error(`diagram ${dId} is already in the running order`);
+  if (!p.sequence) p.sequence = { slides: [] };
+  p.sequence.slides.push(dId);
+}
+
+export function removeFromSequence(p, dId) {
+  const i = sequenceIndex(p, dId);
+  if (i < 0) throw new Error(`diagram ${dId} is not in the running order`);
+  p.sequence.slides.splice(i, 1);
+  if (!p.sequence.slides.length) delete p.sequence;
+}
+
+export function moveInSequence(p, dId, toIndex) {
+  const i = sequenceIndex(p, dId);
+  if (i < 0) throw new Error(`diagram ${dId} is not in the running order`);
+  const slides = p.sequence.slides;
+  const to = Math.max(0, Math.min(slides.length - 1, Math.trunc(toIndex)));
+  slides.splice(i, 1);
+  slides.splice(to, 0, dId);
 }

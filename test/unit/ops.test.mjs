@@ -5,6 +5,7 @@ import { EditorStore, HISTORY_LIMIT } from '../../src/ui/editor/store.js';
 import {
   removeDiagram, replaceAsset, duplicateHotspot, addHotspot, setRect, moveZ, addAction, removeAction,
   setDefaultAction, addDiagramFromAsset, emptyProject, referencesTo, markAlignmentReviewed, addAnnotation, updateAnnotation,
+  addToSequence, removeFromSequence, moveInSequence, sequenceIndex,
 } from '../../src/ui/editor/ops.js';
 import { validateProject } from '../../src/core/validate.js';
 
@@ -125,4 +126,30 @@ test('a project built from scratch validates once its pieces are in place', () =
   const n = addAnnotation(p, d2, { x: 0.95, y: 0.5 });
   updateAnnotation(p, d2, n, { text: 'Hello\nworld', width: 0.5 });
   assert.deepEqual(validateProject(p).errors, []);
+});
+
+const projectWith = (ids) => {
+  const p = emptyProject();
+  p.assets.push({ id: 'a', path: 'assets/a.png', mimeType: 'image/png', width: 10, height: 10 });
+  for (const id of ids) p.diagrams.push({ id, title: id, assetId: 'a', description: '', hotspots: [], annotations: [] });
+  p.rootDiagramId = ids[0];
+  return p;
+};
+
+test('sequence ops: add appends, move clamps, removing the last entry deletes sequence', () => {
+  const p = projectWith(['d1', 'd2', 'd3']);
+  addToSequence(p, 'd2'); addToSequence(p, 'd1');
+  assert.deepEqual(p.sequence.slides, ['d2', 'd1']);
+  assert.equal(sequenceIndex(p, 'd3'), -1);
+  assert.throws(() => addToSequence(p, 'd2'), /already in the running order/);
+  moveInSequence(p, 'd1', -5); assert.deepEqual(p.sequence.slides, ['d1', 'd2']);
+  moveInSequence(p, 'd1', 99); assert.deepEqual(p.sequence.slides, ['d2', 'd1']);
+  removeFromSequence(p, 'd1'); removeFromSequence(p, 'd2');
+  assert.equal('sequence' in p, false);
+});
+
+test('removing a diagram also removes it from the running order', () => {
+  const p = projectWith(['d1', 'd2']); addToSequence(p, 'd1'); addToSequence(p, 'd2');
+  removeDiagram(p, 'd2', {});
+  assert.deepEqual(p.sequence.slides, ['d1']);
 });
