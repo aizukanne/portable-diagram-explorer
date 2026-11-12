@@ -19,14 +19,14 @@ exports as one HTML file that runs by double-clicking. Per-session detail lives 
 | Date | Topic | Log |
 |---|---|---|
 | 2026-11-06 | v1 built end to end: spike, design, plan, 11 stories, sample, acceptance report | [`2026-11-06_v1-build.md`](project-logs/2026-11-06_v1-build.md) |
+| 2026-11-12 | Owner reviewed the design decisions (21 approved, D11/D12 amended); note bug #15 reproduced | [`2026-11-12_decision-review-and-v1.1.md`](project-logs/2026-11-12_decision-review-and-v1.1.md) |
 
 ## Next Session Should Start With
 
-1. **Owner review of the design decisions** (spec Part 2). None has been reviewed. The ones that
-   most affect users: D18, the Escape order; the focus rule in the acceptance report's A07 note;
-   D20, alignment review blocking export; D11, the archive limits.
-2. **Run the browser matrix on real hardware:** branded Safari on macOS, Edge on Windows, and A14
-   on a reference laptop [#12]. Until then those browsers are unproven, not failed.
-3. **Initial-open time for maximum-size presentations in Firefox and WebKit** (3.4–15.6 s on the
-   test server, against a 5 s target) [#13]. Measure on real hardware before changing anything.
-4. **Screen-reader and forced-colours verification** [#14].
+1. **Fix the note bug [#15]**: notes cannot be selected, edited or deleted once deselected. The
+   regression test `test/e2e/note-reselect.spec.mjs` fails in all three engines.
+2. **Implement the D11 amendment**: skip OS clutter entries in imported ZIPs, and say which were skipped.
+3. **v1.1 feature epic: spec + design**, covering sequential "next slide" navigation that does not
+   depend on hotspots, and SVG images (D12 amendment).
+4. Owner hardware checks, still open: browser matrix and A14 on real hardware [#12], initial-open time
+   [#13], screen readers [#14].

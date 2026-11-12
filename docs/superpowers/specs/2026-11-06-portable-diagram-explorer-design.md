@@ -8,9 +8,10 @@ safety rules, targets and acceptance scenarios A01–A14 are binding and are not
 **Part 2 (this document)** records the engineering decisions that the specification leaves open,
 the measurements that constrain them, and the risks.
 
-**Review state:** Part 1 is owner-authored. **Part 2 has NOT been reviewed by the owner.** Every
-decision below was made by the implementing session on 2026-11-06 under the owner's instruction
-"build the app". Each is marked *proposed*. Where Part 2 and Part 1 disagree, Part 1 wins.
+**Review state:** Part 1 is owner-authored. **Part 2 was reviewed by the owner in dialogue on
+2026-11-12** (see the register below). The decisions were made by the implementing session on
+2026-11-06 under the owner's instruction "build the app". At review, 21 were approved as built and two
+were amended (D11, D12). Where Part 2 and Part 1 disagree, Part 1 wins.
 
 ---
 
@@ -48,7 +49,20 @@ claimed:
 - Windows and macOS file handling.
 - Real-hardware performance.
 
-## 2. Decisions register (all *proposed*, not owner-reviewed)
+## 2. Decisions register (owner-reviewed in dialogue 2026-11-12)
+
+**Rulings, 2026-11-12.** Approved individually as built: D3, D10, D13, D18, D19, D20, D21, and the
+A07 focus rule (the window heading takes focus on open, and Close returns focus to the component that
+opened the window). Approved as a batch of internal engineering choices: D1, D2, D4–D9, D14–D17, D22, D23.
+**Amended:**
+
+- **D11:** keep the size and count limits. Known operating-system clutter entries (`__MACOSX/…`,
+  `.DS_Store`, `Thumbs.db`, `desktop.ini`) are **skipped, and the author is told which ones were
+  skipped**. Any other unknown entry is still rejected by name. Why: re-zipping a package in macOS
+  Finder adds these entries, and the strict rule would refuse the package.
+- **D12:** the owner wants **SVG images accepted** as well. SVG can carry scripts and external
+  references, so this is a feature with its own design and security review, not a change of limit.
+  It is carried into the next feature epic. Until that ships, the PNG/JPEG/WebP rule stands.
 
 | # | Decision | Alternatives | Why |
 |---|---|---|---|
