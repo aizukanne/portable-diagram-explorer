@@ -4,12 +4,13 @@
 // discarded. Nothing here touches the DOM or asset bytes.
 import { newId } from '../../core/ids.js';
 import { clampRect, roundRect } from '../../core/geometry.js';
+import { IMAGE_TYPES } from '../../core/sniff.js';
 
 const ASPECT_TOLERANCE = 0.005;
 
 export function emptyProject(title = 'Untitled project') {
   return {
-    schemaVersion: 1, projectId: newId('p'), title, rootDiagramId: '',
+    schemaVersion: 2, projectId: newId('p'), title, rootDiagramId: '',
     assets: [], diagrams: [], settings: { tooltipDelayMs: 350, showHotspotHints: true },
   };
 }
@@ -34,7 +35,7 @@ function dropUnusedAssets(p) {
 // asset: { id, mimeType, width, height, name } from the AssetManager.
 export function addDiagramFromAsset(p, asset, title) {
   if (!p.assets.some((a) => a.id === asset.id)) {
-    p.assets.push({ id: asset.id, path: `assets/${asset.id}.${{ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[asset.mimeType]}`, mimeType: asset.mimeType, width: asset.width, height: asset.height });
+    p.assets.push({ id: asset.id, path: `assets/${asset.id}.${IMAGE_TYPES[asset.mimeType]}`, mimeType: asset.mimeType, width: asset.width, height: asset.height });
   }
   const d = { id: newId('d'), title: title || 'Untitled diagram', assetId: asset.id, description: '', hotspots: [], annotations: [] };
   p.diagrams.push(d);
@@ -98,7 +99,7 @@ export function replaceAsset(p, dId, asset) {
   const d = findDiagram(p, dId);
   const old = p.assets.find((a) => a.id === d.assetId);
   if (!p.assets.some((a) => a.id === asset.id)) {
-    p.assets.push({ id: asset.id, path: `assets/${asset.id}.${{ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[asset.mimeType]}`, mimeType: asset.mimeType, width: asset.width, height: asset.height });
+    p.assets.push({ id: asset.id, path: `assets/${asset.id}.${IMAGE_TYPES[asset.mimeType]}`, mimeType: asset.mimeType, width: asset.width, height: asset.height });
   }
   d.assetId = asset.id;
   const ratioOld = old ? old.width / old.height : asset.width / asset.height;

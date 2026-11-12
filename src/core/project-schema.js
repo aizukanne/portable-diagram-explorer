@@ -26,7 +26,14 @@ export const PROJECT_SCHEMA = {
   additionalProperties: false,
   required: ['schemaVersion', 'projectId', 'title', 'rootDiagramId', 'assets', 'diagrams'],
   properties: {
-    schemaVersion: { type: 'integer', const: 1, examples: [1], description: 'Version of this file format. This application reads version 1.' },
+    schemaVersion: { type: 'integer', const: 2, examples: [2], description: 'Version of this file format. This application reads versions 1 and 2 and migrates version 1 to 2 on open, so the value checked here is always 2.' },
+    sequence: {
+      type: 'object', additionalProperties: false, required: ['slides'],
+      description: 'Optional running order: the diagrams shown one after another in a presentation, independent of hotspot links.',
+      properties: {
+        slides: { type: 'array', minItems: 1, maxItems: 500, items: ID, examples: [['d-overview', 'd-identity']], description: 'Diagram IDs in presentation order. Each must name a diagram in "diagrams" and appear at most once. Omit "sequence" entirely for no running order.' },
+      },
+    },
     projectId: ID,
     title: { type: 'string', minLength: 1, maxLength: 200, examples: ['Customer Platform'], description: 'Project title, shown in the presentation and used for file names.' },
     rootDiagramId: { ...ID, description: 'ID of the overview diagram the presentation opens on. It must name a diagram in "diagrams".' },
@@ -66,7 +73,7 @@ export const PROJECT_SCHEMA = {
       properties: {
         id: ID,
         path: { type: 'string', pattern: '^assets/[a-z0-9][a-z0-9._-]{0,120}$', examples: ['assets/a-overview-overview.png'], description: 'Package-relative path of the image file: "assets/" followed by lowercase letters, digits, ".", "_" or "-". No absolute or parent paths.' },
-        mimeType: { type: 'string', enum: ['image/png', 'image/jpeg', 'image/webp'], examples: ['image/png'], description: 'Image type. Version 1 accepts PNG, JPEG and WebP only.' },
+        mimeType: { type: 'string', enum: ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'], examples: ['image/png'], description: 'Image type. Accepted: PNG, JPEG, WebP and SVG.' },
         width: { type: 'integer', minimum: 1, maximum: 100000, examples: [1920], description: 'Displayed width in pixels after orientation is applied.' },
         height: { type: 'integer', minimum: 1, maximum: 100000, examples: [1080], description: 'Displayed height in pixels after orientation is applied.' },
       },

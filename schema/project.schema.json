@@ -15,11 +15,41 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "const": 1,
+      "const": 2,
       "examples": [
-        1
+        2
       ],
-      "description": "Version of this file format. This application reads version 1."
+      "description": "Version of this file format. This application reads versions 1 and 2 and migrates version 1 to 2 on open, so the value checked here is always 2."
+    },
+    "sequence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "slides"
+      ],
+      "description": "Optional running order: the diagrams shown one after another in a presentation, independent of hotspot links.",
+      "properties": {
+        "slides": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 500,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$",
+            "examples": [
+              "d-overview"
+            ],
+            "description": "An opaque, stable identifier: 1–64 letters, digits, \"-\" or \"_\", starting with a letter or digit. It never encodes parentage or a filename."
+          },
+          "examples": [
+            [
+              "d-overview",
+              "d-identity"
+            ]
+          ],
+          "description": "Diagram IDs in presentation order. Each must name a diagram in \"diagrams\" and appear at most once. Omit \"sequence\" entirely for no running order."
+        }
+      }
     },
     "projectId": {
       "type": "string",
@@ -154,12 +184,13 @@
           "enum": [
             "image/png",
             "image/jpeg",
-            "image/webp"
+            "image/webp",
+            "image/svg+xml"
           ],
           "examples": [
             "image/png"
           ],
-          "description": "Image type. Version 1 accepts PNG, JPEG and WebP only."
+          "description": "Image type. Accepted: PNG, JPEG, WebP and SVG."
         },
         "width": {
           "type": "integer",

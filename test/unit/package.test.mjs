@@ -37,7 +37,8 @@ test('sniffing decides the type from bytes; slugs are safe', () => {
 });
 
 test('project zip round trip preserves everything and asset bytes exactly; paths are deterministic', async () => {
-  const { project, assets } = fixture();
+  const { project: v1project, assets } = fixture();
+  const project = { ...v1project, schemaVersion: 2 };
   const { bytes } = await buildProjectZip(project, assets, '<!doctype html><title>e</title>', '0.1.0');
   const back = await readProjectZip(bytes);
   assert.deepEqual(back.issues.filter((i) => i.severity === 'error'), []);
@@ -158,4 +159,39 @@ test('envelope warns above the spec §12 numbers and not below', () => {
   big.diagrams[0].hotspots = Array.from({ length: 101 }, (_, i) => ({ ...structuredClone(project.diagrams[0].hotspots[0]), id: `h${i}` }));
   const codes = measureEnvelope(big, assets).warnings.map((w) => w.code);
   assert.ok(codes.includes('W_ENVELOPE_DIAGRAMS') && codes.includes('W_ENVELOPE_SCENE'));
+});
+
+test('presentation format 2 round-trips the running order; format 1 still reads', () => {
+  const { project, assets } = fixture();
+  const p = { ...project, schemaVersion: 2, sequence: { slides: [project.diagrams[1].id] } };
+  const back = readPresentationHtml(buildPresentationHtml(TEMPLATE, p, assets, '0.2.0'));
+  assert.deepEqual(back.project.sequence, { slides: [project.diagrams[1].id] });
+  assert.equal(back.migratedFrom, null);
+  const v1 = buildPresentationHtml(TEMPLATE, project, assets, '0.1.0').replace('"formatVersion":2', '"formatVersion":1');
+  assert.ok(v1.includes('"formatVersion":1'));
+  const r1 = readPresentationHtml(v1);
+  assert.equal(r1.issues.filter((i) => i.severity === 'error').length, 0);
+  assert.equal(r1.migratedFrom, 1);
+});
+
+test('README in a saved package states schemaVersion 2; SVG assets get .svg paths', async () => {
+  const { project, assets } = fixture();
+  const p = { ...project, schemaVersion: 2 };
+  assert.match(assignAssetPaths({ ...p, assets: [{ ...p.assets[0], mimeType: 'image/svg+xml' }] })[0].path, /\.svg$/);
+  const { bytes } = await buildProjectZip(p, assets, '<html></html>', '0.2.0');
+  assert.match(new TextDecoder().decode((await readZip(bytes)).get('README.txt')), /schemaVersion 2/);
+});
+
+test('readProjectZip and readLooseFiles report migratedFrom 1 for a v1 file, null for v2', async () => {
+  const { project, assets } = fixture();
+  const v1zip = await buildProjectZip(project, assets, '<html></html>', '0.1.0');
+  assert.equal((await readProjectZip(v1zip.bytes)).migratedFrom, 1);
+  const p2 = { ...project, schemaVersion: 2 };
+  const v2zip = await buildProjectZip(p2, assets, '<html></html>', '0.2.0');
+  assert.equal((await readProjectZip(v2zip.bytes)).migratedFrom, null);
+  const files = (pr, zip) => [{ name: 'project.json', bytes: enc(JSON.stringify(pr)) },
+    ...zip.project.assets.map((a) => ({ name: a.path.replace(/^.*\//, ''), relativePath: a.path, bytes: assets.get(a.id) }))];
+  assert.equal(readLooseFiles(files(zip1(v1zip), v1zip)).migratedFrom, 1);
+  assert.equal(readLooseFiles(files(zip1(v2zip), v2zip)).migratedFrom, null);
+  function zip1(z) { return z.project; }
 });

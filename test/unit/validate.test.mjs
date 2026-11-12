@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validateProject, parseProjectJson } from '../../src/core/validate.js';
+import { validateProject, parseProjectJson, migrate } from '../../src/core/validate.js';
 import { PROJECT_SCHEMA } from '../../src/core/project-schema.js';
 import { validateSchema, assertSchemaKeywords } from '../../src/core/schema.js';
 import { newId, ID_PATTERN } from '../../src/core/ids.js';
@@ -43,7 +43,7 @@ const cases = [
   ['missing root', (p) => { p.rootDiagramId = 'd-none'; }, 'E_ROOT_MISSING'],
   ['unknown action type', (p) => { p.diagrams[0].hotspots[0].actions[0].type = 'script'; }, 'E_SCHEMA_ENUM'],
   ['unknown property', (p) => { p.diagrams[0].onclick = 'x'; }, 'E_SCHEMA_UNKNOWN'],
-  ['future schema', (p) => { p.schemaVersion = 2; }, 'E_FUTURE_SCHEMA'],
+  ['future schema', (p) => { p.schemaVersion = 3; }, 'E_FUTURE_SCHEMA'],
   ['bad schema version', (p) => { p.schemaVersion = '1'; }, 'E_SCHEMA_VERSION'],
   ['alignment pending', (p) => { p.diagrams[1].alignmentReviewRequired = true; }, 'E_ALIGN_REVIEW'],
   ['no actions', (p) => { p.diagrams[1].hotspots[0].actions = []; p.diagrams[1].hotspots[0].defaultActionId = null; }, 'E_NO_ACTIONS'],
@@ -51,7 +51,7 @@ const cases = [
   ['missing required', (p) => { delete p.diagrams[0].hotspots[0].rect; }, 'E_SCHEMA_REQUIRED'],
   ['absolute asset path', (p) => { p.assets[0].path = '/home/me/overview.png'; }, 'E_SCHEMA_PATTERN'],
   ['traversal asset path', (p) => { p.assets[0].path = 'assets/../x.png'; }, 'E_SCHEMA_PATTERN'],
-  ['svg mime', (p) => { p.assets[0].mimeType = 'image/svg+xml'; }, 'E_SCHEMA_ENUM'],
+  ['gif mime', (p) => { p.assets[0].mimeType = 'image/gif'; }, 'E_SCHEMA_ENUM'],
   ['javascript target id', (p) => { p.diagrams[0].hotspots[0].actions[0].targetDiagramId = 'javascript:alert(1)'; }, 'E_SCHEMA_PATTERN'],
   ['oversized image', (p) => { p.assets[0].width = 20000; p.assets[0].height = 20000; }, 'E_IMAGE_TOO_LARGE'],
   ['annotation beyond image', (p) => { p.diagrams[1].annotations[0].x = 0.8; }, 'E_RECT_BOUNDS'],
@@ -104,4 +104,56 @@ test('newId is opaque, prefixed and schema-valid', () => {
   const ids = new Set(Array.from({ length: 1000 }, () => newId('h')));
   assert.equal(ids.size, 1000);
   for (const id of ids) assert.match(id, ID_PATTERN);
+});
+
+const v2 = (extra) => {
+  const base = sample();
+  return {
+    ...base, schemaVersion: 2,
+    diagrams: [...base.diagrams, { id: 'd-orphan', title: 'Orphan', assetId: base.assets[0].id, annotations: [], hotspots: [] }],
+    ...extra,
+  };
+};
+
+test('v1 files migrate to v2 unchanged apart from the version', () => {
+  const v1 = sample();
+  const r = migrate(v1);
+  assert.equal(r.project.schemaVersion, 2);
+  assert.equal(r.migratedFrom, 1);
+  assert.deepEqual({ ...r.project, schemaVersion: 1 }, v1);
+  assert.equal(validateProject(v1).errors.length, 0);
+});
+
+test('a v2 file reports no migration', () => {
+  assert.equal(migrate(v2({})).migratedFrom, null);
+});
+
+test('a version 3 file is refused as future, naming 2 as the highest readable', () => {
+  const [i] = migrate({ ...sample(), schemaVersion: 3 }).issues;
+  assert.equal(i.code, 'E_FUTURE_SCHEMA');
+  assert.match(i.expected, /2 or lower/);
+});
+
+test('sequence: duplicates and unknown IDs are errors naming the path and value', () => {
+  const p = v2({ sequence: { slides: ['d-overview', 'd-nope', 'd-overview'] } });
+  const codes = validateProject(p).errors.map((e) => `${e.code} ${e.path} ${e.received}`);
+  assert.ok(codes.includes('E_SEQ_UNKNOWN_DIAGRAM sequence.slides[1] "d-nope"'));
+  assert.ok(codes.includes('E_SEQ_DUPLICATE sequence.slides[2] "d-overview"'));
+});
+
+test('a diagram in the running order is not reported unreachable', () => {
+  const p = v2({});
+  assert.ok(validateProject(p).warnings.some((w) => w.code === 'W_UNREACHABLE'));
+  p.sequence = { slides: ['d-orphan'] };
+  assert.ok(!validateProject(p).warnings.some((w) => w.code === 'W_UNREACHABLE'));
+});
+
+test('image/svg+xml is an accepted asset type', () => {
+  const p = v2({}); p.assets[0].mimeType = 'image/svg+xml';
+  assert.equal(validateProject(p).errors.length, 0);
+});
+
+test('parseProjectJson carries migratedFrom through', () => {
+  assert.equal(parseProjectJson(JSON.stringify(sample())).migratedFrom, 1);
+  assert.equal(parseProjectJson(JSON.stringify(v2({}))).migratedFrom, null);
 });

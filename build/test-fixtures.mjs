@@ -61,6 +61,10 @@ export function viewerFixture() {
 export async function writeTestFixtures(outDir, presentationTemplate, version, editorHtml) {
   const { project, assets } = viewerFixture();
   const t = `${outDir}/test`;
+  // Running-order fixtures (schema v2): one without the overview in the sequence, one with it.
+  const slidesProject = (slides) => ({ ...structuredClone(project), schemaVersion: 2, sequence: { slides } });
+  writeFileSync(`${t}/slides.presentation.html`, buildPresentationHtml(presentationTemplate, slidesProject(['d-loop-a', 'd-identity', 'd-shared']), assets, version));
+  writeFileSync(`${t}/slides-with-overview.presentation.html`, buildPresentationHtml(presentationTemplate, slidesProject(['d-overview', 'd-identity', 'd-shared']), assets, version));
   writeFileSync(`${t}/viewer-fixture.presentation.html`, buildPresentationHtml(presentationTemplate, project, assets, version));
   // Editor fixtures (A02, A09, A11, authoring): a saved package and hostile variants.
   const good = await buildProjectZip(project, assets, editorHtml, version);

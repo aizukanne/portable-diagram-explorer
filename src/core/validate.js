@@ -6,7 +6,7 @@
 import { PROJECT_SCHEMA } from './project-schema.js';
 import { validateSchema, makeIssue } from './schema.js';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const LARGE_IMAGE_SIDE = 4096;
 export const MAX_DECODED_PIXELS = 100_000_000;
 const EPS = 1e-9;
@@ -39,8 +39,10 @@ export function migrate(raw) {
       `This file was written by a newer version of the application (format ${v}); reading it with an older one could silently lose data.`,
       'Open it with the editor.html that was saved alongside it, or with a newer version of Portable Diagram Explorer.')] };
   }
-  // Version 1 is current; later versions add explicit, tested steps here.
-  return { project: raw, issues: [] };
+  // Version 1 -> 2 only adds optional fields (sequence, SVG assets), so the step is the version bump.
+  // Later versions add explicit, tested steps here.
+  if (v === 1) return { project: { ...raw, schemaVersion: 2 }, issues: [], migratedFrom: 1 };
+  return { project: raw, issues: [], migratedFrom: null };
 }
 
 function orderOf(hotspots) {
@@ -166,13 +168,31 @@ function semantic(p, out) {
     });
   });
 
+  const slides = p.sequence && Array.isArray(p.sequence.slides) ? p.sequence.slides : [];
+  const slideSeen = new Set();
+  slides.forEach((id, i) => {
+    if (typeof id !== 'string') return;
+    const sp = `sequence.slides[${i}]`;
+    if (!diagramIds.includes(id)) {
+      out.push(makeIssue('E_SEQ_UNKNOWN_DIAGRAM', sp, id, `the ID of a diagram in "diagrams": ${diagramList}`,
+        'The running order lists the diagrams presented in sequence; one that does not exist cannot be shown.',
+        'Choose an existing diagram ID for this entry, or remove the entry from the running order.'));
+    } else if (slideSeen.has(id)) {
+      out.push(makeIssue('E_SEQ_DUPLICATE', sp, id, 'each diagram at most once in sequence.slides',
+        `"${id}" already appears earlier in the running order, so stepping through would show it twice.`,
+        'Remove the repeated entry; a diagram appears in the running order at most once.'));
+    }
+    slideSeen.add(id);
+  });
+
   if (typeof p.rootDiagramId === 'string' && !diagramIds.includes(p.rootDiagramId)) {
     out.push(makeIssue('E_ROOT_MISSING', 'rootDiagramId', p.rootDiagramId, `one of the diagram IDs: ${diagramList}`,
       'The presentation opens on the overview diagram; without it nothing can be shown.', 'Choose an existing diagram as the overview.'));
   } else if (typeof p.rootDiagramId === 'string') {
     const byId = new Map(p.diagrams.filter((d) => d && typeof d.id === 'string').map((d) => [d.id, d]));
-    const reached = new Set([p.rootDiagramId]);
-    const queue = [p.rootDiagramId];
+    const seeds = [p.rootDiagramId, ...slides.filter((id) => typeof id === 'string' && byId.has(id))];
+    const reached = new Set(seeds);
+    const queue = [...reached];
     while (queue.length) {
       const d = byId.get(queue.shift());
       for (const h of (d && Array.isArray(d.hotspots) ? d.hotspots : [])) {
@@ -185,9 +205,9 @@ function semantic(p, out) {
     }
     p.diagrams.forEach((d, di) => {
       if (d && typeof d.id === 'string' && !reached.has(d.id)) {
-        out.push(makeIssue('W_UNREACHABLE', `diagrams[${di}]`, d.title || d.id, 'a diagram that some hotspot opens, starting from the overview',
-          `No path of hotspots leads from the overview to "${d.title || d.id}", so presentation viewers cannot reach it.`,
-          'Add an "Open diagram" action that targets it, or delete it if it is no longer needed.', 'warning'));
+        out.push(makeIssue('W_UNREACHABLE', `diagrams[${di}]`, d.title || d.id, 'a diagram that some hotspot opens, starting from the overview, or one listed in the running order',
+          `No path of hotspots leads from the overview to "${d.title || d.id}", and it is not in the running order, so presentation viewers cannot reach it.`,
+          'Add an "Open diagram" action that targets it, add it to the running order, or delete it if it is no longer needed.', 'warning'));
       }
     });
   }

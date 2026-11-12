@@ -5,6 +5,7 @@ export const IMAGE_TYPES = Object.freeze({
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
+  'image/svg+xml': 'svg',
 });
 
 export function sniffImage(bytes) {

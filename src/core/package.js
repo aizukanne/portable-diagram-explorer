@@ -10,18 +10,18 @@
 import { readZip, writeZip, ZipError } from './zip.js';
 import { parseProjectJson, validateProject, migrate } from './validate.js';
 import { makeIssue } from './schema.js';
-import { sniffImage, slug } from './sniff.js';
+import { sniffImage, slug, IMAGE_TYPES } from './sniff.js';
 import { jsonForHtml, extractJsonBlock } from './embed.js';
 import { referencedAssetIds } from './envelope.js';
 
 export const PRESENTATION_FORMAT = 'pde-presentation';
-export const PRESENTATION_FORMAT_VERSION = 1;
+export const PRESENTATION_FORMAT_VERSION = 2;
 const DATA_PLACEHOLDER = '__PDE_' + 'DATA__';
 const TITLE_PLACEHOLDER = '__PDE_' + 'TITLE__';
 
 const README = (title, version) => `Portable Diagram Explorer project: ${title}
 
-This archive is an editable project (format: project.json schemaVersion 1;
+This archive is an editable project (format: project.json schemaVersion 2;
 written by Portable Diagram Explorer ${version}).
 
 To continue editing:
@@ -65,7 +65,7 @@ export function escapeHtmlText(s) {
 export function assignAssetPaths(project) {
   const taken = new Set();
   return project.assets.map((a) => {
-    const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[a.mimeType] || 'bin';
+    const ext = IMAGE_TYPES[a.mimeType] || 'bin';
     const name = a.path ? a.path.replace(/^.*\//, '') : '';
     const stem = slug(name.replace(new RegExp(`^${a.id.replace(/[^A-Za-z0-9]/g, '.')}-`, 'i'), ''), 40);
     let base = `${a.id.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}-${stem}`;
@@ -172,7 +172,7 @@ export async function readProjectZip(bytes) {
       issues.push(makeIssue('W_PKG_EXTRA_FILE', name, name, 'only images listed in project.json', 'Files no asset refers to are ignored.', 'Remove the file, or ignore this if it is intentional.', 'warning'));
     }
   }
-  return { project, assets, issues };
+  return { project, assets, issues, migratedFrom: parsed.migratedFrom };
 }
 
 // files: [{ name, relativePath, bytes }] chosen together with the file picker.
@@ -204,7 +204,7 @@ export function readLooseFiles(files) {
       `project.json lists "${a.path}", but no selected file has that name.`, `Select ${base} together with project.json.`) };
   }, issues);
   if (!assets) return { project: null, assets: new Map(), issues };
-  return { project, assets, issues };
+  return { project, assets, issues, migratedFrom: parsed.migratedFrom };
 }
 
 export function buildPresentationHtml(template, project, assetBytes, appVersion) {
@@ -229,11 +229,11 @@ export function readPresentationData(raw, { decodeAssets = true } = {}) {
   let data;
   try { data = JSON.parse(raw); } catch (e) { return bad('E_JSON_SYNTAX', e.message, 'The embedded project data is damaged.', 'Export the presentation again from the editor.'); }
   if (!data || data.format !== PRESENTATION_FORMAT) return bad('E_PRES_FORMAT', data && data.format, 'The embedded data is not a Portable Diagram Explorer presentation.', 'Choose a presentation exported by this application.');
-  if (data.formatVersion !== PRESENTATION_FORMAT_VERSION) {
+  if (data.formatVersion !== 1 && data.formatVersion !== PRESENTATION_FORMAT_VERSION) {
     return bad(data.formatVersion > PRESENTATION_FORMAT_VERSION ? 'E_FUTURE_SCHEMA' : 'E_PRES_FORMAT', data.formatVersion,
       'The presentation was written in a format version this editor does not read.', 'Open it with a matching or newer version of the editor.');
   }
-  const { project, issues: mig } = migrate(data.project);
+  const { project, issues: mig, migratedFrom } = migrate(data.project);
   if (!project) return { project: null, assets: new Map(), issues: mig };
   const embedded = data.assets && typeof data.assets === 'object' ? data.assets : {};
   const assets = admit(project, (a) => {
@@ -249,7 +249,7 @@ export function readPresentationData(raw, { decodeAssets = true } = {}) {
     }
   }, issues);
   if (!assets) return { project: null, assets: new Map(), issues };
-  return { project, assets, issues, appVersion: data.appVersion, raw: data };
+  return { project, assets, issues, appVersion: data.appVersion, raw: data, migratedFrom };
 }
 
 export function readPresentationHtml(text) {

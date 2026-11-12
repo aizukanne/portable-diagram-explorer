@@ -50,6 +50,10 @@ test('A02: open a package, edit one hotspot, save, reopen: everything else is id
   const pb = JSON.parse(new TextDecoder().decode(after.get('project.json')));
   expect(pb.diagrams[1].hotspots[0].rect.x).toBe(0.125);
   pb.diagrams[1].hotspots[0].rect.x = pa.diagrams[1].hotspots[0].rect.x;
+  // The fixture is a v1 file; saving writes the current format (migration changes only the version).
+  expect(pa.schemaVersion).toBe(1);
+  expect(pb.schemaVersion).toBe(2);
+  pb.schemaVersion = pa.schemaVersion;
   expect(pb).toEqual(pa);
   for (const [name, bytes] of before) if (name.startsWith('assets/')) expect(sha(after.get(name))).toBe(sha(bytes));
   // The package carries this editor, byte for byte (design D6).
