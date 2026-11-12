@@ -118,8 +118,13 @@ test('A09: a dangling target opens with the error listed, and blocks export unti
 
 test('A09: an unsupported file is refused by name', async ({ page }) => {
   await open(page);
+  // A text file that is an SVG but states no size is refused for that reason (v1.1: SVG is supported).
   await addImages(page, T('images/not-an-image.png'));
   const dlg = page.getByRole('dialog', { name: 'Some files were not imported' });
+  await expect(dlg.locator('.pde-issue-code')).toHaveText('E_SVG_NO_SIZE');
+  await dlg.getByRole('button', { name: 'Close' }).click();
+  // A genuinely unsupported format is still refused as such.
+  await addImages(page, T('images/animated.gif'));
   await expect(dlg.locator('.pde-issue-code')).toHaveText('E_IMAGE_TYPE');
 });
 

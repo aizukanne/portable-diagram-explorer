@@ -1,5 +1,6 @@
 // Test harness: one SceneRenderer over a generated 1600x900 image (test-only).
 import { SceneRenderer } from '../../../src/ui/renderer.js';
+import { DIAGRAM_SVG } from '../../helpers/svg-diagram.mjs';
 
 const W = 1600;
 const H = 900;
@@ -28,7 +29,13 @@ g.strokeStyle = '#ccc';
 for (let x = 0; x < W; x += 100) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
 for (let y = 0; y < H; y += 100) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
 for (const hs of HOTSPOTS) { g.fillStyle = '#9ec5fe'; g.fillRect(hs.rect.x * W, hs.rect.y * H, hs.rect.width * W, hs.rect.height * H); }
-c.toBlob((blob) => {
+if (location.search === '?svg') {
+  // SVG mode: the scene is the 1200x800 SVG drawing; one hotspot over its marker rect.
+  const svgHotspots = [{ id: 'h-svg', label: 'Marker', tooltip: '', rect: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 }, zIndex: 1, hasMenu: false }];
+  const url = URL.createObjectURL(new Blob([DIAGRAM_SVG], { type: 'image/svg+xml' }));
+  r.setScene({ title: 'SVG harness', width: 1200, height: 800, hotspots: svgHotspots, annotations: [] }, url)
+    .then(() => { document.documentElement.dataset.ready = '1'; });
+} else c.toBlob((blob) => {
   r.setScene({ title: 'Harness', width: W, height: H, hotspots: HOTSPOTS, annotations: [{ id: 'n-1', text: '<b>not bold</b>\nsecond line', x: 0.05, y: 0.8, width: 0.3 }] }, URL.createObjectURL(blob))
     .then(() => { document.documentElement.dataset.ready = '1'; });
 }, 'image/png');

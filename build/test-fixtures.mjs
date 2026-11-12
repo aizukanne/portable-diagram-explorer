@@ -2,6 +2,7 @@
 // The viewer fixture is produced through the real export path.
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { png } from '../test/helpers/png.mjs';
+import { DIAGRAM_SVG, RISKY_SVG, NOSIZE_SVG } from '../test/helpers/svg.mjs';
 import { buildPresentationHtml, buildProjectZip } from '../src/core/package.js';
 import { writeZip, readZip } from '../src/core/zip.js';
 
@@ -89,4 +90,8 @@ export async function writeTestFixtures(outDir, presentationTemplate, version, e
   writeFileSync(`${t}/images/service-lld.png`, png(800, 800, [235, 250, 238], [box(0.25, 0.25, 0.5, 0.5, [60, 160, 90])]));
   writeFileSync(`${t}/images/square.png`, png(900, 900, [250, 250, 250], [box(0.1, 0.1, 0.3, 0.3, [10, 10, 10])]));
   writeFileSync(`${t}/images/not-an-image.png`, new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>'));
+  writeFileSync(`${t}/images/diagram.svg`, new TextEncoder().encode(DIAGRAM_SVG));
+  writeFileSync(`${t}/images/risky.svg`, new TextEncoder().encode(RISKY_SVG));
+  writeFileSync(`${t}/images/nosize.svg`, new TextEncoder().encode(NOSIZE_SVG));
+  writeFileSync(`${t}/images/animated.gif`, new Uint8Array(Buffer.from('R0lGODlhAQABAAAAACw=', 'base64')));
 }

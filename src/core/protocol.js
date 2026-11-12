@@ -54,7 +54,7 @@ const PARENT_TYPES = {
   RENDER_SCENE: {
     fields: ['sceneToken', 'scene', 'image', 'viewport', 'selectedHotspotId', 'settings'],
     check: (m) => TOKEN_RE.test(m.sceneToken) && isScene(m.scene)
-      && exactKeys(m.image, ['dataUrl']) && typeof m.image.dataUrl === 'string' && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(m.image.dataUrl)
+      && exactKeys(m.image, ['dataUrl']) && typeof m.image.dataUrl === 'string' && /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/.test(m.image.dataUrl)
       && (m.viewport === null || isView(m.viewport)) && (m.selectedHotspotId === null || isId(m.selectedHotspotId))
       && exactKeys(m.settings, ['tooltipDelayMs', 'showHotspotHints']) && Number.isInteger(m.settings.tooltipDelayMs)
       && m.settings.tooltipDelayMs >= 0 && m.settings.tooltipDelayMs <= 5000 && typeof m.settings.showHotspotHints === 'boolean',

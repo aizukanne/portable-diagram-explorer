@@ -18,7 +18,22 @@ export function sniffImage(bytes) {
   if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) {
     return { mimeType: 'image/webp', ext: 'webp' };
   }
+  if (looksLikeSvg(b)) return { mimeType: 'image/svg+xml', ext: 'svg' };
   return null;
+}
+
+// SVG is text, so it is recognised by its root element: after an optional BOM, whitespace,
+// XML declaration, comments and a DOCTYPE, the document must open with <svg ...> carrying
+// the SVG namespace. An HTML page that merely contains an <svg> is not an SVG image.
+const SVG_PREAMBLE = /^(?:\s+|<\?xml[\s\S]*?\?>|<\!--[\s\S]*?--\>|<!DOCTYPE[^>[]*(?:\[[^\]]*\])?\s*>)/i;
+const SVG_ROOT_TAG = /^<svg[\s>/][^>]*>?/;
+const SVG_NS_ATTR = /\sxmlns\s*=\s*(?:"http:\/\/www\.w3\.org\/2000\/svg"|'http:\/\/www\.w3\.org\/2000\/svg')/;
+function looksLikeSvg(bytes) {
+  let t = new TextDecoder('utf-8').decode(bytes.subarray(0, 4096));
+  if (t.charCodeAt(0) === 0xfeff) t = t.slice(1);
+  for (let m = SVG_PREAMBLE.exec(t); m; m = SVG_PREAMBLE.exec(t)) t = t.slice(m[0].length);
+  const root = SVG_ROOT_TAG.exec(t);
+  return !!root && SVG_NS_ATTR.test(root[0]);
 }
 
 // What kind of file the user picked, from its first bytes.

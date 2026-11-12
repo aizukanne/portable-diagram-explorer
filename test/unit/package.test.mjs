@@ -195,3 +195,30 @@ test('readProjectZip and readLooseFiles report migratedFrom 1 for a v1 file, nul
   assert.equal(readLooseFiles(files(zip1(v2zip), v2zip)).migratedFrom, null);
   function zip1(z) { return z.project; }
 });
+
+test('SVG sniffing: preamble tolerated, HTML containing <svg> is not SVG (Review focus 3)', () => {
+  const svg = enc('\uFEFF<?xml version="1.0"?>\n<!-- c -->\n<!DOCTYPE svg>\n<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>');
+  assert.equal(sniffImage(svg).mimeType, 'image/svg+xml');
+  assert.equal(sniffImage(svg).ext, 'svg');
+  assert.equal(sniffFileKind(svg), 'image');
+  const html = enc('<!doctype html><html><body><svg xmlns="http://www.w3.org/2000/svg"></svg></body></html>');
+  assert.equal(sniffImage(html), null);
+  assert.equal(sniffFileKind(html), 'html');
+  assert.equal(sniffImage(enc('<svg width="1" height="1"/>')), null); // no SVG namespace
+  assert.equal(sniffImage(enc("<svg xmlns='http://www.w3.org/2000/svg'/>")).mimeType, 'image/svg+xml'); // single quotes
+  assert.equal(sniffImage(enc('<svgfoo xmlns="http://www.w3.org/2000/svg"/>')), null); // root name must end at the tag name
+});
+
+test('a presentation with an SVG whose root tag follows a long preamble opens in the viewer (header-only check)', async () => {
+  const { readPresentationData } = await import('../../src/core/package.js');
+  const { project, assets } = fixture();
+  const svg = enc(`<?xml version="1.0"?>\n<!-- ${'x'.repeat(3000)} -->\n<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900"><rect width="1" height="1"/></svg>`);
+  assets.set('a-overview', svg);
+  project.assets.find((a) => a.id === 'a-overview').mimeType = 'image/svg+xml';
+  project.assets.find((a) => a.id === 'a-overview').path = 'assets/overview.svg';
+  const html = buildPresentationHtml(TEMPLATE, project, assets, '0.1.0');
+  const block = html.match(/<script type="application\/json" id="pde-data">([\s\S]*?)<\/script>/)[1];
+  const r = readPresentationData(block, { decodeAssets: false });
+  assert.ok(r.project);
+  assert.deepEqual(r.issues.filter((i) => i.severity === 'error'), []);
+});

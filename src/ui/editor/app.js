@@ -75,9 +75,9 @@ export class EditorApp {
       return el;
     };
     this.inputs = {
-      open: fileInput('open', '.zip,.html,.htm,.json,image/png,image/jpeg,image/webp', true, (f) => this.openFiles(f)),
-      add: fileInput('add-images', 'image/png,image/jpeg,image/webp', true, (f) => this.addImages(f)),
-      replace: fileInput('replace-image', 'image/png,image/jpeg,image/webp', false, (f) => this.replaceImage(f)),
+      open: fileInput('open', '.zip,.html,.htm,.json,image/png,image/jpeg,image/webp,image/svg+xml,.svg', true, (f) => this.openFiles(f)),
+      add: fileInput('add-images', 'image/png,image/jpeg,image/webp,image/svg+xml,.svg', true, (f) => this.addImages(f)),
+      replace: fileInput('replace-image', 'image/png,image/jpeg,image/webp,image/svg+xml,.svg', false, (f) => this.replaceImage(f)),
     };
     this.titleInput = h('input', { class: 'pde-title-input', type: 'text', maxlength: '200', 'aria-label': 'Project title' });
     this.titleInput.addEventListener('input', () => this.edit((p) => updateProjectMeta(p, { title: this.titleInput.value }), { label: 'Rename project', coalesce: 'project-title', quiet: true }));
@@ -524,16 +524,19 @@ export class EditorApp {
 
   async addImages(files) {
     const issues = [];
+    const warnings = [];
     let firstId = null;
     for (const f of files) {
       const r = await this.assets.importImage(f.name, f.bytes);
       if (r.issue) { issues.push(r.issue); continue; }
+      warnings.push(...r.warnings);
       const id = this.edit((p) => addDiagramFromAsset(p, r.asset, titleFromFile(f.name)), { label: 'Add diagram' });
       if (!firstId) firstId = id;
       if (r.asset.width > 4096 || r.asset.height > 4096) this.status(`${f.name} is ${r.asset.width} × ${r.asset.height}; very large images open and zoom slowly.`);
     }
     if (firstId) this.showDiagram(firstId);
-    if (issues.length) await this.showIssueDialog('Some files were not imported', 'Nothing else was changed.', issues);
+    if (issues.length) await this.showIssueDialog('Some files were not imported', 'Nothing else was changed.', [...issues, ...warnings]);
+    else if (warnings.length) await this.showIssueDialog('Imported, with warnings', 'The images were imported. These parts of them will not be shown.', warnings);
   }
 
   async replaceImage(files) {
@@ -547,6 +550,7 @@ export class EditorApp {
     if (res.aspectChanged) this.status(`Image replaced (${res.from} → ${res.to}). Its proportions changed: review every hotspot, then choose "Mark alignment reviewed".`);
     else if (res.sizeChanged) this.status(`Image replaced (${res.from} → ${res.to}). Same proportions, so hotspots keep their positions.`);
     else this.status('Image replaced.');
+    if (r.warnings.length) await this.showIssueDialog('Image replaced, with warnings', 'These parts of the image will not be shown.', r.warnings);
   }
 
   async deleteDiagram(id) {

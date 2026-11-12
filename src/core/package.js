@@ -102,6 +102,10 @@ function decodeUtf8(bytes, path, issues) {
   }
 }
 
+// SVG is recognised from its root tag, which can follow a long preamble: sniffImage reads up to
+// 4096 bytes (= 5464 base64 characters, a multiple of 4), so that much of an SVG is decoded for the check.
+const SVG_HEADER_B64 = 5464;
+
 // Shared admission: structure first, then image bytes, then semantic issues.
 function admit(project, getBytes, issues) {
   const v = validateProject(project);
@@ -113,7 +117,7 @@ function admit(project, getBytes, issues) {
     if (got.issue) { issues.push(got.issue); return; }
     const t = sniffImage(got.bytes);
     if (!t || t.mimeType !== a.mimeType) {
-      issues.push(makeIssue('E_ASSET_TYPE', `assets[${i}]`, `${got.name}: ${t ? t.mimeType : 'not a PNG, JPEG or WebP image'}`, a.mimeType,
+      issues.push(makeIssue('E_ASSET_TYPE', `assets[${i}]`, `${got.name}: ${t ? t.mimeType : 'not a PNG, JPEG, WebP or SVG image'}`, a.mimeType,
         'The file content must match the declared image type; a mismatch means the file was replaced or damaged.',
         `Replace ${got.name} with the original ${a.mimeType} file, or re-import the image in the editor.`));
       return;
@@ -242,7 +246,7 @@ export function readPresentationData(raw, { decodeAssets = true } = {}) {
       return { issue: makeIssue('E_PKG_MISSING_ASSET', `assets.${a.id}`, '(absent)', `embedded bytes for image ${a.id}`, 'The presentation must carry every image it shows.', 'Export the presentation again from the editor.') };
     }
     try {
-      if (!decodeAssets) return { bytes: base64ToBytes(e.base64.slice(0, 24)), name: a.path, headerOnly: true };
+      if (!decodeAssets) return { bytes: base64ToBytes(e.base64.slice(0, a.mimeType === 'image/svg+xml' ? SVG_HEADER_B64 : 24)), name: a.path, headerOnly: true };
       return { bytes: base64ToBytes(e.base64), name: a.path };
     } catch {
       return { issue: makeIssue('E_PKG_CORRUPT', `assets.${a.id}`, '(invalid base64)', 'base64-encoded image bytes', 'The embedded image data is damaged.', 'Export the presentation again from the editor.') };

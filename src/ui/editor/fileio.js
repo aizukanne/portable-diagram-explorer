@@ -61,7 +61,7 @@ export async function interpretSelection(files) {
   return {
     kind: 'error',
     issues: bad.map((f) => makeIssue('E_OPEN_UNSUPPORTED', f.name, f.name,
-      'a .diagram.zip project, a .presentation.html, project.json with its images, or PNG/JPEG/WebP images',
+      'a .diagram.zip project, a .presentation.html, project.json with its images, or PNG/JPEG/WebP/SVG images',
       'Only these files can be opened; other content is never interpreted.', 'Choose one of the accepted files.')),
   };
 }

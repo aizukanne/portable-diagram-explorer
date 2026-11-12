@@ -110,11 +110,14 @@ export class SceneRenderer {
     this.renderContent();
     this.apply();
     const loaded = new Promise((resolve, reject) => {
-      if (this.img.getAttribute('src') === imageUrl && this.img.complete && this.img.naturalWidth) { resolve(); return; }
-      this.img.onload = () => resolve();
-      this.img.onerror = () => reject(new Error(`the image for "${scene.title}" could not be decoded`));
+      // Loaded-ness is tracked by events, never by naturalWidth: for an SVG without
+      // width/height, naturalWidth is a per-engine guess (SP-1). The scene size, not the
+      // image's own, drives layout (img.width/height above).
+      if (this.img.getAttribute('src') === imageUrl && this.imgLoaded) { resolve(); return; }
+      this.img.onload = () => { this.imgLoaded = true; resolve(); };
+      this.img.onerror = () => { this.imgLoaded = false; reject(new Error(`the image for "${scene.title}" could not be decoded`)); };
     });
-    if (this.img.getAttribute('src') !== imageUrl) this.img.src = imageUrl;
+    if (this.img.getAttribute('src') !== imageUrl) { this.imgLoaded = false; this.img.src = imageUrl; }
     return loaded;
   }
 
@@ -640,6 +643,7 @@ export class SceneRenderer {
     this.host.removeEventListener('keydown', this.bound.keydown);
     this.host.removeEventListener('keyup', this.bound.keyup);
     this.host.removeEventListener('scroll', this.bound.scroll);
+    this.imgLoaded = false;
     this.img.removeAttribute('src');
     clear(this.host);
   }

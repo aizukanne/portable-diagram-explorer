@@ -33,7 +33,7 @@ const render = makeMessage(ctx.channel, 5, 'RENDER_SCENE', { sceneToken: tok, sc
 test('frame accepts a well-formed render and rejects a non-data image URL or extra scene data', () => {
   assert.equal(validateParentMessage(render, ctx).ok, true);
   assert.equal(validateParentMessage({ ...render, image: { dataUrl: 'https://example.com/x.png' } }, ctx).ok, false);
-  assert.equal(validateParentMessage({ ...render, image: { dataUrl: 'data:image/svg+xml;base64,AAAA' } }, ctx).ok, false);
+  assert.equal(validateParentMessage({ ...render, image: { dataUrl: 'data:image/gif;base64,AAAA' } }, ctx).ok, false);
   assert.equal(validateParentMessage({ ...render, scene: { ...scene, actions: [] } }, ctx).ok, false);
 });
 
@@ -41,4 +41,11 @@ test('KEY accepts Next and Previous, still rejects unknown keys', () => {
   const C = ctx.channel;
   const ok = (key) => validateChildMessage({ pde: 1, channel: C, seq: 9, type: 'KEY', key }, { channel: C, lastSeq: 0, sceneToken: null }).ok;
   assert.equal(ok('Next'), true); assert.equal(ok('Previous'), true); assert.equal(ok('ArrowRight'), false);
+});
+
+test('RENDER_SCENE accepts SVG data URLs and still rejects other types', () => {
+  const okRender = (dataUrl) => validateParentMessage({ ...render, image: { dataUrl } }, ctx).ok;
+  assert.equal(okRender('data:image/svg+xml;base64,PHN2Zz4='), true);
+  assert.equal(okRender('data:text/html;base64,PGI+'), false);
+  assert.equal(okRender('data:image/svg;base64,PHN2Zz4='), false);
 });
