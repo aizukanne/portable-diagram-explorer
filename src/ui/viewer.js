@@ -189,8 +189,9 @@ export class Viewer {
     this.noticeDismissed = true;
     if (this.notice) this.notice.remove();
     this.notice = null;
-    // The focused button is gone; keep focus somewhere sensible.
-    this.app.querySelector('h1.pde-project-title').focus();
+    // The focused button is gone; keep focus inside what is interactive. While a
+    // drill-down is open the page behind it is inert, so the dialog heading takes it.
+    if (this.nav.isOpen) this.modalTitle.focus(); else this.app.querySelector('h1.pde-project-title').focus();
   }
 
   // ---- layout --------------------------------------------------------------

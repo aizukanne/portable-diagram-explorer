@@ -9,6 +9,9 @@ const { FRAME_SCRIPT_HASH, FRAME_START_DEADLINE_MS } = JSON.parse(readFileSync(p
 const P = (f) => pathToFileURL(path.resolve('dist/test', f)).href;
 const host = (page, f) => page.goto(P(f));
 const inner = (page) => page.frameLocator('iframe').first();
+// The id of the element that really holds focus in the presentation (toBeFocused passed
+// while document.activeElement was <body> here, so it is not trusted).
+const activeId = (page) => inner(page).locator('body').evaluate(() => (document.activeElement && document.activeElement.id) || document.activeElement.tagName);
 
 // The refusal wording differs per engine (measured in the Playwright 1.64.1 containers):
 //   Chromium  "Executing inline script violates the following Content Security Policy directive ... a hash ('sha256-...')"
@@ -84,7 +87,7 @@ test('A26: frame cannot start (hosted-hash-only.html) -> in-page fallback within
       return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
     })).toBe(true);
     // The swap took focus from the destroyed frame; it is back on the dialog heading.
-    await expect(inner(page).locator('.pde-modal-title')).toBeFocused();
+    await expect.poll(() => activeId(page)).toBe('pde-modal-title');
     // The sealed frame is gone for the session.
     await expect(inner(page).locator('iframe.pde-frame')).toHaveCount(0);
     // Navigation still works in the fallback: Back, breadcrumbs, and going deeper.
@@ -159,6 +162,22 @@ test('A26c: a notice dismissed earlier comes back when the fallback changes the 
   await inner(page).locator('.pde-root-view rect.pde-hotspot').first().click();
   await expect(inner(page).locator('.pde-modal .pde-host-notice')).toContainText('reduced isolation', { timeout: FRAME_START_DEADLINE_MS + 5000 });
   await expect(inner(page).locator('.pde-modal .pde-host-notice')).toBeVisible();
+});
+
+test('Dismiss inside the open drill-down (keyboard) keeps focus in the dialog', async ({ page }) => {
+  await host(page, 'hosted-hash-only.html');
+  await inner(page).locator('.pde-root-view rect.pde-hotspot').first().click();
+  // Wait for the fallback itself: the base notice is already in the dialog before it, and a
+  // later swap would move focus to the heading and hide what this test is checking.
+  await expect(inner(page).locator('.pde-modal .pde-inpage-scene .pde-image')).toBeVisible({ timeout: FRAME_START_DEADLINE_MS + 5000 });
+  await expect(inner(page).locator('.pde-modal .pde-host-notice')).toContainText('reduced isolation');
+  const dismiss = inner(page).locator('.pde-modal .pde-host-notice').getByRole('button', { name: 'Dismiss' });
+  await dismiss.focus();
+  await expect(dismiss).toBeFocused(); // focus really moved off the heading, so the check below can fail
+  await page.keyboard.press('Enter');
+  await expect(inner(page).locator('.pde-host-notice')).toHaveCount(0);
+  await expect(inner(page).locator('.pde-modal-layer')).toBeVisible();
+  await expect.poll(() => activeId(page)).toBe('pde-modal-title');
 });
 
 test('Review focus 4: a malformed nonce is ignored, the frame starts as on file://', async ({ page }) => {
