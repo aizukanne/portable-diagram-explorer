@@ -35,6 +35,11 @@ files['edge.svg'] = {
   count: 3,
   svg: `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="#fff"/><rect x="100" y="100" width="100" height="100" fill="#000"/><path d="M220 60 L380 240" stroke="#000" stroke-width="2" fill="none"/></svg>`,
 };
+// edge-big.svg: 2000x1600 with a hard-edged 500x400 black rectangle (left edge at x=1000, y 800..1200).
+files['edge-big.svg'] = {
+  count: 2,
+  svg: `<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1600"><rect width="2000" height="1600" fill="#fff"/><rect x="1000" y="800" width="500" height="400" fill="#000"/></svg>`,
+};
 for (const [name, { svg, count }] of Object.entries(files)) {
   writeFileSync(path.join(dir, name), svg);
   console.log(name, count, 'elements', svg.length, 'bytes');

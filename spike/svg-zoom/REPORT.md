@@ -6,23 +6,38 @@ Throwaway measurement. Page structure and CSS copy `src/ui/renderer.js` / `src/s
 Engines: Playwright 1.64.1 Chromium, Firefox, WebKit, headless, in the pinned Docker container
 (software rendering, no GPU). Run: `PW_CONFIG=spike/svg-zoom/playwright.config.mjs scripts/e2e.sh`.
 Generated SVGs are gitignored; `gen.mjs` and the spec regenerate them.
+Sharpness/naturalWidth: add `-g sharpness`; pan: `-g "pan cost"` (the pan tables were produced before the spec was split in two; the pan code is unchanged).
 
 ## (a) Sharpness at rest (300 ms after the transform settles)
 
-Drawing: `edge.svg` (400x300, a black 100x100 square on white). Metric: crop of 120x60 px around the
-square's left edge, luminance along the middle row. `step` = largest luminance jump between adjacent
-pixels (255 = a perfectly crisp black/white edge); `ramp` = pixels strictly between 10% and 90%
-luminance (0 = crisp). The raster reference is the same SVG screenshotted at 1x as a PNG, shown the same way.
+Metric: crop of 120x60 px around a hard vertical edge, luminance along the middle row. `step` =
+largest luminance jump between adjacent pixels (255 = a perfectly crisp black/white edge); `ramp` =
+pixels strictly between 10% and 90% luminance (0 = crisp; a single anti-aliased pixel at a sub-pixel
+edge position gives ramp 1 and step below 255, which is the ideal vector result). Raster reference =
+the same drawing screenshotted at 1x as a PNG (for the 2000x1600 drawing, the 400x300 region around the
+edge), shown at the same scale/translate. Drawings: `edge.svg` (400x300) and `edge-big.svg` (2000x1600,
+hard 500x400 black rectangle, left edge at x=1000), so 1600% is an effective 32,000 x 25,600 px raster.
+The sub-pixel row is scale 3.7 with the edge placed at x = 200.37 px. Cells are `step / ramp`, SVG | PNG.
+Conditions: DPR 1, headless software rendering, at rest, one run (`sharp-*.json`, final run).
 
-| Engine | SVG 400% step/ramp | SVG 1600% step/ramp | PNG 400% step/ramp | PNG 1600% step/ramp | SVG blurred? |
-|---|---|---|---|---|---|
-| Chromium | 255 / 0 | 255 / 0 | 64 / 4 | 16 / 13 | **no** |
-| Firefox | 255 / 0 | 255 / 0 | 64 / 4 | 16 / 13 | **no** |
-| WebKit | 255 / 0 | 255 / 0 | 64 / 4 | 16 / 12 | **no** |
+| Cell | Chromium SVG \| PNG | Firefox SVG \| PNG | WebKit SVG \| PNG |
+|---|---|---|---|
+| edge 400x300 @25% | 255/0 \| 255/0 | 255/2 \| 223/2 | 255/1 \| 255/0 |
+| edge 400x300 @100% | 255/0 \| 255/0 | 255/0 \| 255/0 | 255/0 \| 255/0 |
+| edge 400x300 @400% | 255/0 \| 64/4 | 255/0 \| 64/4 | 255/0 \| 64/4 |
+| edge 400x300 @1600% | 255/0 \| 16/13 | 255/0 \| 16/13 | 255/0 \| 16/12 |
+| edge 400x300 @370% +0.37px | 122/1 \| 75/3 | 255/0 \| 80/3 | 161/1 \| 69/3 |
+| big 2000x1600 @100% | 255/0 \| 255/0 | 255/0 \| 255/0 | 255/0 \| 255/0 |
+| big 2000x1600 @400% | 255/0 \| 64/4 | 255/0 \| 64/4 | 255/0 \| 64/4 |
+| big 2000x1600 @1600% | 255/0 \| 16/13 | 255/0 \| 16/13 | 255/0 \| 16/12 |
+| big 2000x1600 @370% +0.37px | 122/1 \| 75/3 | 255/0 \| 80/3 | 161/1 \| 69/3 |
 
-In every engine the SVG stays perfectly crisp at 400% and 1600% (the browser re-rasterises the
-vector at the new scale), while the 1x PNG is visibly blurred (ramp 4 px, then 12-13 px). Sub-100% scales
-(25%) were also crisp (ramp 0-2 px). Values identical across all runs.
+Reading: at every measured cell the SVG is crisp in all three engines, including the 2000x1600 drawing
+at 1600% (no sign of a raster/texture-size cap at the edge in view). At the non-integer scale with a
+sub-pixel edge, SVG shows a ramp of 1 px (one anti-aliased pixel; Firefox snaps the edge to a whole pixel,
+ramp 0) against 3 px for the PNG. The only SVG ramp above 1 is Firefox at 25% (2 px; the PNG is also 2).
+The PNG blurs from 400% upward (ramp 4, then 12-13 px). Not measured: other non-integer scales, the
+grid drawings' text, fractional DPR, GPU rasterisation.
 
 ## (c) `naturalWidth` / `naturalHeight`
 
@@ -76,26 +91,30 @@ about 3, not as a benchmark.
 
 ## Decisions
 
-**Re-raster-at-rest needed: Chromium no, Firefox no, WebKit no.** At rest all three re-rasterise the
-SVG sharply at 400% and 1600% under `will-change: transform`; the app does not need its own
-re-raster-at-rest step for SVG images (rasters, by contrast, blur, which is expected).
+**Re-raster-at-rest needed: Chromium no, Firefox no, WebKit no, for the conditions measured only:**
+DPR 1, headless software rendering, at rest (300 ms after the transform), a hard black/white edge, scales
+25%, 100%, 370% (+0.37 px sub-pixel), 400% and 1600%, on a 400x300 and a 2000x1600 drawing. Every one of
+those cells was crisp in all three engines (step 255 or a single anti-aliased pixel; ramp 0-1, 2 for
+Firefox at 25% only), while the PNG reference blurred. Not covered: DPR 2, GPU rasterisation, mid-gesture
+sharpness, huge drawings other than this one.
 
 **Element-count warning threshold: not derivable from this data; the brief's rule is triggered but the
 cause is not element count.** The brief says keep 200,000 unless p95 exceeds 50 ms below that count.
 Strictly, that is the case: Chromium exceeds 50 ms p95 at every count measured, down to 501 elements
 (p95 330 ms, median 106 ms), and Firefox/WebKit exceed it in some cells from 501 elements up (all with
-large run-to-run variance). But Chromium's cost at 100% does not grow with element count (501: 106 ms
-median; 5,001: 79 ms; 100,001: 248 ms) while the same drawings pan at 16-25 ms at 400%, so the driver in
-this setup is the size of the area being re-rasterised in software, not the number of elements.
-Firefox and WebKit stay near 17-25 ms median up to 100,001 elements. This run therefore does **not**
-support lowering the V11 warning to any specific count, nor does it show that 200,000 is safe in Chromium
-without a GPU. Recommendation: keep 200,000 as the nominal warning for now, and re-measure Chromium
+large run-to-run variance). In Chromium the cost at 100% does not rise with element count across the counts measured (501: 106 ms
+median; 5,001: 79 ms; 100,001: 248 ms), and the same drawings pan at 16-23 ms median at 400%, where fewer
+elements are visible and less area is re-rasterised. That is consistent with a cost driven by re-rasterised
+area, but this run does not isolate it: area and visible-element count change together between 100% and
+400%, and no run varied one while holding the other fixed. Firefox and WebKit stay near 17-25 ms median up
+to 100,001 elements. This run therefore does **not** support lowering the V11 warning to any specific
+count, nor does it show that 200,000 is safe in Chromium without a GPU. Recommendation: keep 200,000 as the nominal warning for now, and re-measure Chromium
 with GPU rasterisation (a real browser, not headless software) before relying on it. Decision for the controller.
 
 ## Caveats
 
 - Headless, software-rendered, shared Docker host: frame times are not representative of a user's GPU.
 - DPR forced to 1 (WebKit's default profile is 2, not measured).
-- Sharpness measured on a small high-contrast drawing (`edge.svg`), not on the grid drawings.
+- Sharpness measured on two hard-edge drawings (`edge.svg`, `edge-big.svg`), not on the grid drawings' text.
 - Not measured: mid-gesture sharpness (only at rest), SVG with `<image>`/filters, transform on zoom (only
   translate during panning), memory.
