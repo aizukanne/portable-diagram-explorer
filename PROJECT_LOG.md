@@ -24,8 +24,8 @@ exports as one HTML file that runs by double-clicking. Per-session detail lives 
 
 ## Next Session Should Start With
 
-1. **Merge `feat/v1.1` into main** once the owner approves, then push. Remove the worktree
-   `/home/sadmin/pde-wt-v11` after the merge.
+1. ~~Merge `feat/v1.1` and push~~ done 2026-11-12 (main 136028d pushed; #15, #17–#24 closed; worktree
+   removed; build ledger copy in ~/backups/pde-v1.1-sdd/).
 2. **LG-1: the owner's SharePoint check** (`docs/lg1-sharepoint-check.md`). #16 stays open until the
    console capture is attached.
 3. Owner hardware checks, still open: browser matrix and A14 on real hardware [#12], initial-open time
