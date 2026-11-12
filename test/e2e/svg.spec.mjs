@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { RISKY_SVG } from '../helpers/svg.mjs';
 
 const EDITOR = path.resolve('dist/editor.html');
 const T = (f) => path.resolve('dist/test', f);
@@ -23,6 +24,14 @@ async function saveDownload(page, buttonName) {
   await d.saveAs(p);
   return { path: p, name: d.suggestedFilename(), bytes: new Uint8Array(readFileSync(p)) };
 }
+// risky.svg posts this message to window.top if any of its script or handlers ever runs.
+const COUNT_PWNED = () => {
+  window.__pwned = 0;
+  window.addEventListener('message', (e) => { if (e.data === 'pde-svg-pwned') window.__pwned++; });
+};
+const pwned = (pg) => pg.evaluate(() => window.__pwned);
+const dataUrl = (text) => `data:image/svg+xml;base64,${Buffer.from(text).toString('base64')}`;
+
 const dialog = (page) => page.locator('.pde-dialog');
 const closeDialog = (page) => dialog(page).getByRole('button', { name: 'Close' }).click();
 
@@ -78,7 +87,24 @@ test('A22b: a viewBox-only SVG is sized from its viewBox, not from the browser\'
   expect(external).toEqual([]);
 });
 
+test('A23-control: the detector CAN fail. The same risky SVG, loaded through deliberately unsafe paths, does run and does fetch', async ({ page }) => {
+  await page.addInitScript(COUNT_PWNED);
+  const requested = [];
+  await page.route(/example\.invalid/, (route) => { requested.push(route.request().url()); route.abort(); });
+  await page.goto('data:text/html,<!doctype html><body><div id="host"></div></body>'); // a navigation, so the init script runs
+  // Safe path first (an <img>, as the app does): detector reads zero.
+  await page.evaluate((src) => new Promise((resolve) => { const i = document.createElement('img'); i.onload = i.onerror = resolve; i.src = src; document.getElementById('host').append(i); }), dataUrl(RISKY_SVG));
+  await page.waitForTimeout(1000);
+  expect(await pwned(page)).toBe(0);
+  expect(requested).toEqual([]);
+  // Unsafe path (harness only, never in src/): a document in an <iframe>. Now the detector must fire.
+  await page.evaluate((src) => { const f = document.createElement('iframe'); f.src = src; document.getElementById('host').append(f); }, dataUrl(RISKY_SVG));
+  await expect.poll(() => pwned(page)).toBeGreaterThan(0);
+  await expect.poll(() => requested.length).toBeGreaterThan(0);
+});
+
 test('A23: risky SVG warns, nothing runs or loads in editor, preview or export', async ({ page, browser }) => {
+  await page.addInitScript(COUNT_PWNED);
   const external = await open(page);
   await addImages(page, [T('images/risky.svg')]);
   await expect(page.locator('.pde-issues')).toContainText('W_SVG_INERT_PARTS');
@@ -95,12 +121,14 @@ test('A23: risky SVG warns, nothing runs or loads in editor, preview or export',
   await page.getByRole('button', { name: 'Exit preview' }).click();
   const exported = await saveDownload(page, 'Export presentation');
   const recipient = await browser.newPage();
+  await recipient.addInitScript(COUNT_PWNED);
   const ext2 = [];
   recipient.on('request', (r) => { if (!/^(file|data|blob|about):/.test(r.url())) ext2.push(r.url()); });
   await recipient.goto(pathToFileURL(exported.path).href);
   await recipient.locator('.pde-root-view rect.pde-hotspot').first().click();
   await expect(recipient.frameLocator('iframe').locator('.pde-image')).toBeVisible();
-  for (const pg of [page, recipient]) expect(await pg.evaluate(() => window.top.pwned)).toBeUndefined();
+  await page.waitForTimeout(500);
+  for (const pg of [page, recipient]) expect(await pwned(pg)).toBe(0);
   expect(external).toEqual([]);
   expect(ext2).toEqual([]);
 });

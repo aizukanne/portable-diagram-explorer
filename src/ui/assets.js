@@ -55,6 +55,13 @@ export class AssetManager {
   async importImage(name, bytes) {
     const t = sniffImage(bytes);
     if (!t) {
+      const head = new TextDecoder('utf-8').decode(bytes.subarray(0, 4096)).replace(/^\uFEFF/, '').trimStart();
+      if (/^<(?:\?xml|(?:[A-Za-z_][\w.-]*:)?svg)/i.test(head)) {
+        return { issue: makeIssue('E_SVG_NOT_RECOGNISED', name, head.slice(0, 100),
+          'an SVG file whose root element is <svg xmlns="http://www.w3.org/2000/svg" ...>, starting within the first 4096 bytes (any xml declaration, comments and DOCTYPE before it must fit in that)',
+          'The file looks like SVG/XML but its root element was not found in the form the importer recognises: an unprefixed <svg> carrying the SVG namespace declaration in its own opening tag. Anything else is not treated as an image.',
+          'Open the file in a text editor and make the root element read <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" ...> (no "svg:" prefix; xmlns inside the opening tag; no ">" before xmlns; shorten any long comment before it), or export it again as plain SVG.') };
+      }
       return { issue: makeIssue('E_IMAGE_TYPE', name, name, 'a PNG, JPEG, WebP or SVG image file',
         'Only these image formats are imported; PDF, GIF and other formats are not.', 'Export the diagram as PNG, JPEG, WebP or SVG and import that file.') };
     }

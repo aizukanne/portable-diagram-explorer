@@ -7,6 +7,7 @@
 import { makeIssue } from '../core/schema.js';
 import { MAX_DECODED_PIXELS } from '../core/validate.js';
 
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
 export const MAX_SVG_BYTES = 20 * 1024 * 1024;
 // SP-1 measured no sharpness or pan limit in all three engines up to the largest drawing
 // tried; the threshold is a guard on parse/decode time, not a measured cliff.
@@ -61,6 +62,15 @@ function countInertParts(doc) {
   return parts;
 }
 
+// The parser's own wording differs per engine and Chromium leads with a generic heading, so
+// quote the first line that names a line number or an error, else the text truncated.
+function parseProblem(bad, root) {
+  if (!bad) return root ? `root element <${root.nodeName}> in namespace ${JSON.stringify(root.namespaceURI)}` : 'no root element';
+  const lines = bad.textContent.split('\n').map((l) => l.trim()).filter(Boolean);
+  const hit = lines.slice(1).find((l) => /line \d+|error/i.test(l)) || lines.find((l) => /line \d+/i.test(l));
+  return (hit || lines.join(' ')).slice(0, 200);
+}
+
 // inspectSvg(bytes) -> { width, height, issues }. width/height are null when they cannot be
 // determined (an error issue says why). Warnings (W_*) do not stop the import.
 export function inspectSvg(bytes, name = 'the SVG file') {
@@ -73,9 +83,8 @@ export function inspectSvg(bytes, name = 'the SVG file') {
   const doc = new DOMParser().parseFromString(new TextDecoder('utf-8').decode(bytes), 'image/svg+xml');
   const bad = doc.getElementsByTagName('parsererror')[0];
   const root = doc.documentElement;
-  if (bad || !root || root.localName !== 'svg') {
-    const why = bad ? bad.textContent.trim().split('\n')[0].slice(0, 120) : 'no <svg> root element';
-    out.issues.push(makeIssue('E_SVG_PARSE', name, why, 'well-formed SVG (XML) text with an <svg> root element',
+  if (bad || !root || root.localName !== 'svg' || root.namespaceURI !== SVG_NAMESPACE) {
+    out.issues.push(makeIssue('E_SVG_PARSE', name, parseProblem(bad, root), 'well-formed SVG (XML) text whose root element is <svg xmlns="http://www.w3.org/2000/svg" ...>',
       'A drawing the browser cannot parse cannot be shown or measured.', 'Re-export the drawing from its editor as plain SVG, or open it in a browser to find the XML error.'));
     return out;
   }
@@ -100,6 +109,7 @@ export function inspectSvg(bytes, name = 'the SVG file') {
   if (out.width * out.height > MAX_DECODED_PIXELS) {
     out.issues.push(makeIssue('E_IMAGE_TOO_LARGE', name, `${out.width} x ${out.height}`, `at most ${MAX_DECODED_PIXELS / 1e6} million pixels`,
       'Decoding larger images can exhaust browser memory on the recipient\'s computer.', 'Reduce the width/height or viewBox of the SVG, or split the diagram into detail images.'));
+    out.width = null; out.height = null;
     return out;
   }
   const parts = countInertParts(doc);
