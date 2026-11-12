@@ -203,3 +203,13 @@ button { font: inherit; color: inherit; }
 .pde-seq-n { color: var(--pde-muted); font-variant-numeric: tabular-nums; }
 .pde-seq-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pde-slide-badge { color: var(--pde-accent); font-weight: 600; }
+
+/* S7: shown when the presentation is inside another site's viewer. */
+.pde-host-notice {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .8rem; padding: .45rem .9rem;
+  background: #fffbeb; color: var(--pde-warn); border-bottom: 1px solid #fcd34d; font-size: 13px;
+}
+.pde-host-notice-text { margin: 0; flex: 1 1 24rem; }
+
+/* The drill-down rendered in the page when the sealed frame cannot start. */
+.pde-inpage-scene { flex: 1; min-width: 0; position: relative; }

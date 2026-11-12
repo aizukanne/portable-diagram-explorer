@@ -21,6 +21,7 @@ const read = (p) => readFileSync(p, 'utf8');
 export const SELF_MARK = '__PDE_' + 'SELF__';
 export const DATA_MARK = '__PDE_DATA__';
 export const TITLE_MARK = '__PDE_TITLE__';
+export const NONCE_MARK = '__NONCE_ATTR__';
 
 function checkCss(name, css) {
   if (/<\/style|<!--/i.test(css)) throw new Error(`${name} contains "</style" or "<!--"`);
@@ -45,7 +46,11 @@ export async function buildAll({ outDir = 'dist', withTestHarness = false } = {}
   ].join('; ');
   const frameDoc = `<!doctype html><html lang="en" data-channel="__CHANNEL__"><head><meta charset="utf-8">`
     + `<meta http-equiv="Content-Security-Policy" content="${frameCsp}">`
-    + `<style>${frameCss}</style></head><body><script>${frameJs}</script></body></html>`;
+    // Both inline tags are marked so the page can pass its host's CSP nonce on to the
+    // frame (src/ui/bridge.js). A nonce attribute is not part of the hashed text, so the
+    // hash above is unchanged; dist/frame.html is written with the marks replaced by nothing.
+    + `<style${NONCE_MARK}>${frameCss}</style></head><body><script${NONCE_MARK}>${frameJs}</script></body></html>`;
+  if (frameDoc.split(NONCE_MARK).length !== 3) throw new Error(`frame template must contain ${NONCE_MARK} exactly twice`);
 
   const hostCsp = (hostJs) => [
     "default-src 'none'",
@@ -64,7 +69,11 @@ export async function buildAll({ outDir = 'dist', withTestHarness = false } = {}
 
   // 2. Presentation template.
   const presJs = bundle('src/ui/presentation-main.js', {
-    preamble: `const __BUILD__ = ${jsonForHtml({ version: VERSION, frameTemplate: frameDoc })};`,
+    // The first statement of the script reads the nonce the host gave THIS script
+    // (currentScript is only set while it runs synchronously). It is validated where it
+    // is used (src/ui/build-info.js hostNonce).
+    preamble: `const __BUILD__ = ${jsonForHtml({ version: VERSION, frameTemplate: frameDoc })};\n`
+      + `__BUILD__.hostNonce = (document.currentScript && document.currentScript.nonce) || '';`,
   });
   const presentationTemplate = head(hostCsp(presJs), TITLE_MARK)
     + `<body class="pde-present">\n<div id="pde-root"></div>\n`
@@ -100,9 +109,13 @@ export async function buildAll({ outDir = 'dist', withTestHarness = false } = {}
     for (const [name, html] of Object.entries(harnesses)) writeFileSync(`${outDir}/test/${name}.html`, html);
     const { writeTestFixtures } = await import('./test-fixtures.mjs');
     await writeTestFixtures(outDir, presentationTemplate, VERSION, editor);
+    const { writeHostPages } = await import('../test/e2e/harness/host-wrapper.mjs');
+    writeHostPages(`${outDir}/test`, { sha, appCss, frameCss });
+    const { FRAME_START_DEADLINE_MS } = await import('../src/ui/bridge.js');
+    writeFileSync(`${outDir}/test/constants.json`, `${JSON.stringify({ FRAME_START_DEADLINE_MS, FRAME_SCRIPT_HASH: sha(frameJs).slice(1, -1) }, null, 2)}\n`);
   }
   writeFileSync(`${outDir}/project.schema.json`, `${JSON.stringify(PROJECT_SCHEMA, null, 2)}\n`);
-  writeFileSync(`${outDir}/frame.html`, frameDoc);
+  writeFileSync(`${outDir}/frame.html`, frameDoc.replaceAll(NONCE_MARK, ''));
   writeFileSync(`${outDir}/presentation-template.html`, presentationTemplate);
   writeFileSync(`${outDir}/editor.html`, editor);
   return { frameDoc, presentationTemplate, editor, version: VERSION };

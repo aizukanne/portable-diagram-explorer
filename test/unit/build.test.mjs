@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { buildAll, SELF_MARK } from '../../build/build.mjs';
@@ -14,7 +14,12 @@ const out = mkdtempSync(path.join(tmpdir(), 'pde-build-'));
 const r = await buildAll({ outDir: out });
 const h = (s) => `'sha256-${createHash('sha256').update(s).digest('base64')}'`;
 
-for (const [name, html] of [['editor', r.editor], ['presentation', r.presentationTemplate], ['frame', r.frameDoc]]) {
+// The frame template marks both inline tags for an optional host nonce (S7); the hash
+// is of the tag's text, so the policy is checked against the template as shipped with
+// the marks filled by nothing.
+const frameAsShipped = r.frameDoc.replaceAll('__NONCE_ATTR__', '');
+
+for (const [name, html] of [['editor', r.editor], ['presentation', r.presentationTemplate], ['frame', frameAsShipped]]) {
   test(`${name}: every inline script and style is admitted by hash; nothing else is`, () => {
     const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
     assert.match(csp, /default-src 'none'/);
@@ -31,6 +36,13 @@ for (const [name, html] of [['editor', r.editor], ['presentation', r.presentatio
   });
 }
 
+test('frame template marks both inline tags for an optional nonce, and nothing else', () => {
+  assert.equal(r.frameDoc.split('__NONCE_ATTR__').length, 3);
+  assert.match(r.frameDoc, /<style__NONCE_ATTR__>/);
+  assert.match(r.frameDoc, /<script__NONCE_ATTR__>/);
+  assert.equal(readFileSync(path.join(out, 'frame.html'), 'utf8'), frameAsShipped, 'the inspection copy has the marks replaced by nothing');
+});
+
 test('the editor reproduces its own bytes exactly (D6)', () => {
   const m = r.editor.match(/<script type="application\/json" id="pde-self">([\s\S]*?)<\/script>/);
   const tpl = JSON.parse(m[1]);
@@ -41,7 +53,7 @@ test('the editor reproduces its own bytes exactly (D6)', () => {
 });
 
 test('script elements open and close in pairs (no premature </script>)', () => {
-  for (const html of [r.editor, r.presentationTemplate, r.frameDoc]) {
+  for (const html of [r.editor, r.presentationTemplate, frameAsShipped]) {
     assert.equal((html.match(/<script[\s>]/g) || []).length, (html.match(/<\/script>/g) || []).length);
   }
 });

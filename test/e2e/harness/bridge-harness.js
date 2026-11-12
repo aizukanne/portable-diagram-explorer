@@ -1,13 +1,25 @@
 // Test harness: a FrameBridge rendering generated scenes (test-only).
 import { FrameBridge } from '../../../src/ui/bridge.js';
+import { buildInfo } from '../../../src/ui/build-info.js';
 
 const root = document.getElementById('pde-root');
 root.style.setProperty('position', 'fixed');
 root.style.setProperty('inset', '0');
 const events = [];
 window.__events = events;
+// `?broken`: the frame template's script is replaced by `throw 0`, so the frame never
+// sends READY. (The replaced text no longer matches the frame's own CSP hash, so the
+// engine refuses it before it can even throw; either way READY never arrives, and
+// onStartFailed must fire within the start-up deadline.)
+const broken = new URLSearchParams(location.search).has('broken');
+if (broken) {
+  const info = buildInfo();
+  info.frameTemplate = info.frameTemplate.replace(/(<script__NONCE_ATTR__>)[\s\S]*(<\/script>)/, (_, a, b) => `${a}throw 0${b}`);
+}
+window.__startFailedAt = 0;
 const bridge = new FrameBridge(root, {
   title: 'Diagram: harness',
+  onStartFailed: () => { window.__startFailedAt = Date.now(); },
   onActivate: (id, mode, anchor) => events.push({ kind: 'activate', id, mode, anchor }),
   onView: (v, sel) => events.push({ kind: 'view', v, sel }),
   onKey: (key) => events.push({ kind: 'key', key }),
@@ -31,4 +43,4 @@ window.__scenes = {
 };
 const urls = { A: image('#cde'), B: image('#edc') };
 window.__render = (k) => bridge.render(window.__scenes[k], urls[k], null, null, settings).then((r) => { window.__rendered = k; return r || 'ok'; });
-window.__render('A').then(() => { document.documentElement.dataset.ready = '1'; });
+window.__render('A').then(() => { document.documentElement.dataset.ready = '1'; }, (e) => { window.__renderRejection = e; });

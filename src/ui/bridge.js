@@ -7,22 +7,32 @@
 // (event.source === the frame's contentWindow), an unguessable per-frame channel,
 // a strictly increasing sequence number and the current scene token. Outbound
 // messages go only to that frame's window; nothing is ever broadcast.
-import { buildInfo } from './build-info.js';
+import { buildInfo, NONCE_RE } from './build-info.js';
 import { makeMessage, validateChildMessage, randomToken } from '../core/protocol.js';
 
 const RENDER_TIMEOUT_MS = 20000;
+// How long the frame has, from its creation, to send READY before the viewer gives up
+// on it and renders drill-downs in the page instead (S7). Spike SP-2 measured the worst
+// p99 at 1206 ms (Firefox under load); the formula max(3 x p99, 2000) gives 3618 ms,
+// rounded up to a whole second. One value for all engines.
+export const FRAME_START_DEADLINE_MS = 4000;
+const NONCE_MARK = '__NONCE_ATTR__';
 
 export class FrameBridge {
-  constructor(container, { onActivate, onView, onKey, title = 'Diagram' } = {}) {
+  // `nonce` is the host page's CSP nonce, if it has one; it is written into the frame's
+  // two inline tags and nowhere else, and only if it is a plain nonce (NONCE_RE).
+  // `onStartFailed` fires once if READY has not arrived within FRAME_START_DEADLINE_MS.
+  constructor(container, { onActivate, onView, onKey, nonce = '', onStartFailed, title = 'Diagram' } = {}) {
     this.channel = randomToken();
     this.outSeq = 0;
     this.inSeq = 0;
     this.ready = false;
+    this.failed = false;
     this.sceneToken = null;
     this.sceneIds = new Set();
     this.pending = null;
     this.queued = null;
-    this.handlers = { onActivate: onActivate || (() => {}), onView: onView || (() => {}), onKey: onKey || (() => {}) };
+    this.handlers = { onActivate: onActivate || (() => {}), onView: onView || (() => {}), onKey: onKey || (() => {}), onStartFailed: onStartFailed || (() => {}) };
     this.stats = { accepted: 0, rejected: 0 };
     const template = buildInfo().frameTemplate;
     if (!template || template.split('__CHANNEL__').length !== 2) throw new Error('frame template missing from build');
@@ -31,15 +41,35 @@ export class FrameBridge {
     this.frame.setAttribute('referrerpolicy', 'no-referrer');
     this.frame.className = 'pde-frame';
     this.frame.title = title;
-    this.frame.srcdoc = template.replace('__CHANNEL__', this.channel);
+    if (template.split(NONCE_MARK).length !== 3) throw new Error('frame template must carry exactly two nonce marks');
+    // A nonce that is not plain base64 text is treated as absent: it cannot carry a quote
+    // or an angle bracket into the markup, whatever the host page put in the attribute.
+    const attr = typeof nonce === 'string' && NONCE_RE.test(nonce) ? ` nonce="${nonce}"` : '';
+    // Function replacements: a string one would interpret "$'" and "$&" in the value.
+    this.frame.srcdoc = template.replaceAll(NONCE_MARK, () => attr).replace('__CHANNEL__', () => this.channel);
     this.onMessage = (e) => this.receive(e);
     window.addEventListener('message', this.onMessage);
     container.append(this.frame);
+    this.startTimer = setTimeout(() => this.startFailed(), FRAME_START_DEADLINE_MS);
     const stats = this.stats;
     Object.defineProperty(window, '__pdeStats', { configurable: true, get: () => ({ ...stats }) });
   }
 
   setTitle(title) { this.frame.title = title; }
+
+  // No READY within the deadline. The frame is not trusted to start later: a render the
+  // caller is waiting on is rejected as { startFailed: true } (not an Error, so the viewer
+  // does not announce it), and the owner is told once so it can render another way.
+  startFailed() {
+    if (this.ready || this.failed) return;
+    this.failed = true;
+    this.queued = null;
+    const p = this.pending;
+    this.pending = null;
+    if (p) clearTimeout(p.timer);
+    this.handlers.onStartFailed();
+    if (p) p.reject({ startFailed: true });
+  }
 
   post(type, fields) {
     if (!this.frame.contentWindow) return;
@@ -62,6 +92,8 @@ export class FrameBridge {
     this.stats.accepted += 1;
     switch (m.type) {
       case 'READY':
+        if (this.failed) break;
+        clearTimeout(this.startTimer);
         this.ready = true;
         if (this.queued) { const q = this.queued; this.queued = null; this.sendRender(q); }
         break;
@@ -88,6 +120,7 @@ export class FrameBridge {
   // render supersedes an older one (whose promise then resolves as superseded).
   render(scene, dataUrl, viewport, selectedHotspotId, settings) {
     if (this.pending) { const p = this.pending; this.pending = null; clearTimeout(p.timer); p.resolve({ superseded: true }); }
+    if (this.failed) return Promise.reject({ startFailed: true });
     const token = randomToken();
     this.sceneToken = token;
     this.sceneIds = new Set(scene.hotspots.map((x) => x.id));
@@ -132,6 +165,7 @@ export class FrameBridge {
   }
 
   destroy() {
+    clearTimeout(this.startTimer);
     window.removeEventListener('message', this.onMessage);
     if (this.pending) { clearTimeout(this.pending.timer); this.pending.resolve({ superseded: true }); this.pending = null; }
     this.frame.removeAttribute('srcdoc');

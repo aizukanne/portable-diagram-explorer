@@ -5,11 +5,19 @@
 import { h, button, clear } from './dom.js';
 import { SceneRenderer } from './renderer.js';
 import { FrameBridge } from './bridge.js';
+import { InPageScene } from './inpage-scene.js';
+import { hostNonce } from './build-info.js';
 import { ComponentMenu } from './menu.js';
 import { NavStack, HISTORY_CAP } from '../core/navigation.js';
 import { SlideCursor } from '../core/slides.js';
 
 const DEFAULT_SETTINGS = { tooltipDelayMs: 350, showHotspotHints: true };
+
+// The host-viewer notice (spec section 5.3). Shown when this page is inside another
+// site's viewer; the second sentence is added once drill-downs had to fall back to
+// rendering in the page.
+const NOTICE_BASE = 'This presentation is being shown inside another site, which limits what it can do. For the full experience, download the file and open it in your browser.';
+const NOTICE_FALLBACK = 'Drill-down diagrams are being shown with reduced isolation.';
 
 export function sceneOf(project, diagram) {
   const asset = project.assets.find((a) => a.id === diagram.assetId);
@@ -110,6 +118,9 @@ export class Viewer {
     this.byId = new Map(project.diagrams.map((d) => [d.id, d]));
     this.nav = new NavStack(HISTORY_CAP);
     this.bridge = null;
+    this.fallback = false; // once the frame has failed to start, drill-downs render in the page for the session
+    this.notice = null;
+    this.noticeDismissed = false;
     this.modalView = null;
     this.modalSelected = null;
     this.originHotspotId = null;
@@ -120,6 +131,43 @@ export class Viewer {
     this.build();
     this.showSlide(this.pageDiagramId);
     this.syncSlidebar();
+    if (this.isHosted()) this.syncNotice();
+  }
+
+  // ---- host notice ---------------------------------------------------------
+
+  // Inside another page's frame? Reading window.top can throw across origins, and a
+  // throw means we are hosted. The editor's own preview never shows the notice.
+  isHosted() {
+    if (this.embedded) return false;
+    try { return window.top !== window.self; } catch { return true; }
+  }
+
+  // Build, update or remove the notice from the current state. `revive` shows it even
+  // if the user dismissed it (the isolation state changed, so they should know).
+  syncNotice({ revive = false } = {}) {
+    if (this.embedded) return;
+    if (revive) this.noticeDismissed = false;
+    if (this.noticeDismissed) return;
+    const text = [this.isHosted() ? NOTICE_BASE : '', this.fallback ? NOTICE_FALLBACK : ''].filter(Boolean).join(' ');
+    if (!text) return;
+    if (!this.notice) {
+      this.noticeText = h('p', { class: 'pde-host-notice-text' });
+      this.notice = h('div', { class: 'pde-host-notice', role: 'status' }, this.noticeText,
+        button('Dismiss', () => this.dismissNotice(), { cls: 'pde-link' }));
+      this.toolbar.after(this.notice);
+    }
+    this.noticeText.textContent = text;
+  }
+
+  showHostNotice() { this.syncNotice({ revive: true }); }
+
+  dismissNotice() {
+    this.noticeDismissed = true;
+    if (this.notice) this.notice.remove();
+    this.notice = null;
+    // The focused button is gone; keep focus somewhere sensible.
+    this.app.querySelector('h1.pde-project-title').focus();
   }
 
   // ---- layout --------------------------------------------------------------
@@ -390,17 +438,44 @@ export class Viewer {
       const r = this.nav.push(targetId, { ...this.modalState(), selectedHotspotId: hs.id });
       if (!r.ok) { this.showCapDialog(); return; }
       // Going deeper from a key or click inside the frame: the frame keeps focus.
-      if (document.activeElement === this.bridge.frame) { this.renderCurrent({}); return; }
+      if (this.focusInBridge()) { this.renderCurrent({}); return; }
     }
     this.renderCurrent({ focus: 'open' });
+  }
+
+  bridgeHandlers() {
+    return {
+      onActivate: (id, mode, anchor) => this.activate('modal', id, mode, anchor),
+      onView: (v, sel) => { this.modalView = v; this.modalSelected = sel; },
+      onKey: (key) => this.onKey(key),
+    };
+  }
+
+  // Focus is "in the frame" when the iframe holds it, or (fallback) something inside
+  // the in-page scene does.
+  focusInBridge() {
+    const f = this.bridge && this.bridge.frame;
+    return !!f && (document.activeElement === f || (f.tagName !== 'IFRAME' && f.contains(document.activeElement)));
+  }
+
+  // The sandboxed frame did not send READY in time (a host page whose policy refuses its
+  // inline script, or any other reason). Render drill-downs in the page from now on,
+  // replay what was being shown, and say so. There is no way back within the session.
+  onFrameStartFailed() {
+    if (this.fallback) return;
+    this.fallback = true;
+    if (this.bridge) this.bridge.destroy();
+    this.bridge = new InPageScene(this.frameHost, this.bridgeHandlers());
+    this.showHostNotice();
+    if (this.nav.isOpen) this.renderCurrent({});
   }
 
   openModal() {
     if (!this.bridge) {
       this.bridge = new FrameBridge(this.frameHost, {
-        onActivate: (id, mode, anchor) => this.activate('modal', id, mode, anchor),
-        onView: (v, sel) => { this.modalView = v; this.modalSelected = sel; },
-        onKey: (key) => this.onKey(key),
+        ...this.bridgeHandlers(),
+        nonce: hostNonce(),
+        onStartFailed: () => this.onFrameStartFailed(),
       });
     }
     this.toolbar.inert = true;
@@ -430,7 +505,7 @@ export class Viewer {
     if (focus === 'open') this.modalTitle.focus();
     else if (focus === 'restore' && (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected)) this.backBtn.focus();
     return this.bridge.render(sceneOf(this.project, d), this.assets.dataUrl(d.assetId), entry.viewport, entry.selectedHotspotId, { ...this.settings })
-      .catch((e) => this.announce(e.message));
+      .catch((e) => { if (!(e && e.startFailed)) this.announce(e.message); });
   }
 
   renderCrumbs() {
@@ -518,12 +593,12 @@ export class Viewer {
   }
 
   wrapFocus(where) {
-    const focusables = [...this.modal.querySelectorAll('button:not([disabled]):not([hidden]), iframe')]
+    const focusables = [...this.modal.querySelectorAll('button:not([disabled]):not([hidden]), iframe, .pde-inpage-scene')]
       .filter((el) => el.offsetParent !== null || el.tagName === 'IFRAME');
     if (!focusables.length) return;
     if (where === 'start') {
       const last = focusables[focusables.length - 1];
-      if (last.tagName === 'IFRAME') this.bridge.focus('last'); else last.focus();
+      if (this.bridge && last === this.bridge.frame) this.bridge.focus('last'); else last.focus();
     } else {
       focusables[0].focus();
     }
