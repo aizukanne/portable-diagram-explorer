@@ -10,6 +10,10 @@ import { h, svg, clear } from './dom.js';
 import { viewTransform, screenToImage, zoomAt, panBy, normalizeView, clampRect, normRectFromPoints, roundRect, DEFAULT_VIEW } from '../core/geometry.js';
 
 const DRAG_THRESHOLD = 5;
+const SWIPE_MIN_PX = 60;
+const SWIPE_RATIO = 2;
+const SWIPE_MAX_MS = 600;
+const SWIPE_MAX_ZOOM = 1.0001;
 const HANDLE_PX = 9;
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
@@ -394,11 +398,14 @@ export class SceneRenderer {
     const p = this.local(e);
     this.pointers.set(e.pointerId, p);
     if (this.pointers.size === 2) {
+      this.swipe0 = null;
       const [a, b] = [...this.pointers.values()];
       this.gesture = { kind: 'pinch', dist: Math.hypot(a.x - b.x, a.y - b.y) };
       return;
     }
     if (this.pointers.size > 2) return;
+    this.swipe0 = e.pointerType === 'touch' && this.opts.mode === 'present' && this.opts.onSwipe
+      ? { x: p.x, y: p.y, t: performance.now(), zoom: this.view.zoom, pointerId: e.pointerId } : null;
     try { this.host.setPointerCapture(e.pointerId); } catch { /* element may be detached */ }
     // Edit gestures cancel the default action (so dragging does not select text),
     // which would also leave keyboard focus in whatever field was used last. Move it
@@ -485,6 +492,15 @@ export class SceneRenderer {
     this.gesture = null;
     this.host.classList.remove('is-dragging');
     const p = this.local(e);
+    const sw = this.swipe0;
+    this.swipe0 = null;
+    if (sw && sw.pointerId === e.pointerId && this.opts.onSwipe && sw.zoom <= SWIPE_MAX_ZOOM) {
+      const dx = p.x - sw.x, dy = p.y - sw.y;
+      if (Math.abs(dx) >= SWIPE_MIN_PX && Math.abs(dx) >= SWIPE_RATIO * Math.abs(dy) && performance.now() - sw.t < SWIPE_MAX_MS) {
+        this.opts.onSwipe(dx < 0 ? 'next' : 'previous');
+        return;
+      }
+    }
     if (g.kind === 'pan') { this.opts.onView(this.getView()); return; }
     if (this.opts.mode === 'present') {
       if (!g.moved && g.hotspotId) {
@@ -510,6 +526,7 @@ export class SceneRenderer {
   }
 
   onPointerCancel(e) {
+    this.swipe0 = null;
     this.pointers.delete(e.pointerId);
     if (this.gesture && this.gesture.kind !== 'pinch') {
       if (this.gesture.kind === 'draw') this.clearPreview();

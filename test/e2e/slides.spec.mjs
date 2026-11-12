@@ -107,3 +107,25 @@ test('R4: at an end, Next/Previous inside a drill-down do nothing — the drill-
   await expect(page.locator('.pde-modal-layer')).toBeHidden();
   await expect(count(page)).toHaveText('2 of 3');
 });
+
+test.describe('S5: touch swipe', () => {
+  test.use({ hasTouch: true, isMobile: false });
+
+  async function swipe(page, dx, ms = 200) {
+    const box = await page.locator('.pde-root-view').boundingBox();
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    const ev = (type, px) => page.locator('.pde-root-view').dispatchEvent(type, { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: px, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1 });
+    await ev('pointerdown', x); await page.waitForTimeout(ms / 2);
+    await ev('pointermove', x + dx / 2); await ev('pointermove', x + dx); await ev('pointerup', x + dx);
+  }
+
+  test('A19: swipe left at fit zoom = Next; zoomed in, the same gesture pans', async ({ page }) => {
+    await page.goto(P('slides.presentation.html'));
+    await swipe(page, -120);
+    await expect(count(page)).toHaveText('1 of 3');
+    await page.getByRole('button', { name: 'Zoom in' }).click();
+    await swipe(page, -120);
+    await expect(count(page)).toHaveText('1 of 3');
+    await swipe(page, 40); await expect(count(page)).toHaveText('1 of 3');     // below threshold
+  });
+});

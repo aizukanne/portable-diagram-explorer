@@ -152,6 +152,7 @@ export class Viewer {
     this.rootRenderer = new SceneRenderer(this.rootHost, {
       mode: 'present',
       slideKeys: this.slides ? 'intercept' : false,
+      onSwipe: this.slides ? (dir) => (dir === 'next' ? this.nextSlide() : this.previousSlide()) : undefined,
       tooltipDelayMs: this.settings.tooltipDelayMs,
       showHints: this.settings.showHotspotHints,
       onActivate: (id, mode, anchor) => {
