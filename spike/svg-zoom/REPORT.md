@@ -103,7 +103,7 @@ cause is not element count.** The brief says keep 200,000 unless p95 exceeds 50 
 Strictly, that is the case: Chromium exceeds 50 ms p95 at every count measured, down to 501 elements
 (p95 330 ms, median 106 ms), and Firefox/WebKit exceed it in some cells from 501 elements up (all with
 large run-to-run variance). In Chromium the cost at 100% does not rise with element count across the counts measured (501: 106 ms
-median; 5,001: 79 ms; 100,001: 248 ms), and the same drawings pan at 16-23 ms median at 400%, where fewer
+median; 5,001: 79 ms; 100,001: 248 ms), and the same drawings pan at 16-23 ms median at 400% in Chromium (16.4 ms and 22.8 ms in the table above, from run 3; an earlier draft said "16-25 ms", which mixed in the 25 ms p95 of the 5,001 @400% cell), where fewer
 elements are visible and less area is re-rasterised. That is consistent with a cost driven by re-rasterised
 area, but this run does not isolate it: area and visible-element count change together between 100% and
 400%, and no run varied one while holding the other fixed. Firefox and WebKit stay near 17-25 ms median up

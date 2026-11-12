@@ -52,7 +52,7 @@ the real SharePoint, so until you run it, "works in SharePoint" is **unproven**.
 ## What counts as a pass
 
 - The diagram image appears in the drill-down window, by either path, and the notice is shown: **pass**.
-- The drill-down window stays empty after 10 seconds, or the notice is missing: **fail**. Post the same
+- The drill-down window stays empty after 5 seconds, or the notice is missing: **fail**. Post the same
   evidence. Do not retry with a different file; the console capture is what tells us which rule blocked it.
 
 ## What this check does not cover

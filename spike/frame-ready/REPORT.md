@@ -38,8 +38,12 @@ frame script) is the first message the frame sends, and the image bytes travel o
 
 ## How the load was verified
 
-A busy-loop (400 ms, iterations counted) ran on the measured page's main thread before and while the workers
-ran; every worker also posted its own iteration rate (all 4 / 16 reported). Throughput drop on the main thread:
+A busy-loop (400 ms, iterations counted) ran on a separate probe page in the same browser context as the measured
+page (not on the measured page's own main thread; `measure.spec.mjs` lines 71-77), before and while the workers
+ran; every worker also posted its own iteration rate (all 4 / 16 reported). The probe's throughput drop below is
+therefore a proxy for CPU contention in that engine's process, not a direct reading of the measured page. The
+probe was closed before the measured pages were opened, so a throughput figure taken after the measurement
+(`thr.after`) was not reported. Throughput drop on the probe page:
 
 | engine | 4 workers ("load") | 16 workers ("saturated") |
 |---|---|---|
@@ -50,7 +54,7 @@ ran; every worker also posted its own iteration rate (all 4 / 16 reported). Thro
 An earlier first pass of the 4-worker condition (not used in the table) showed a *negative* drop in Chromium
 (-8.5%) and +8.3% in Firefox, i.e. that run did not demonstrably load the CPU (other host activity dominated);
 it was discarded and re-run, and the drop above is what the table's "load" rows were measured under. The drop
-varies between runs because the host is shared; treat "load" as "a measured 20-46% main-thread slowdown".
+varies between runs because the host is shared; treat "load" as "a measured 20-46% probe-page throughput slowdown".
 
 ## Results (ms; p50 / p95 / p99; n as above)
 
