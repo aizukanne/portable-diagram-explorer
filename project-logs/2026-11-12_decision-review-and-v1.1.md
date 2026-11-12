@@ -16,6 +16,15 @@
 - **New feature asked by the owner:** move to a next slide or image that no hotspot links to.
   Design to follow, in the same epic as SVG support.
 
+- **#15 fixed** (commit after the review commit): the hotspot layer no longer takes clicks itself,
+  only hotspots and handles do; a hotspot wins over a note beneath it; the diagram inspector lists notes.
+  Verification: unit 112/112, browser 141/141 in Chromium, Firefox and WebKit, including two new
+  regression tests in `test/e2e/note-reselect.spec.mjs`.
+- **New defect #16, reported by the owner:** a presentation viewed inside SharePoint/OneDrive's
+  browser preview shows blank drill-down windows. The console capture shows the viewer's own security
+  policy blocking our drill-down frame's script (hash `do+AvlM…` matches the v1 build). This is a
+  different defect from #15 and not fixed by the review rulings. It goes into the v1.1 spec.
+
 ## Key decisions
 
 - The two amendments are behaviour changes, so each gets an issue and a regression test. They are not

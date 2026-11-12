@@ -23,10 +23,10 @@ exports as one HTML file that runs by double-clicking. Per-session detail lives 
 
 ## Next Session Should Start With
 
-1. **Fix the note bug [#15]**: notes cannot be selected, edited or deleted once deselected. The
-   regression test `test/e2e/note-reselect.spec.mjs` fails in all three engines.
+1. ~~Fix the note bug [#15]~~ done 2026-11-12.
 2. **Implement the D11 amendment**: skip OS clutter entries in imported ZIPs, and say which were skipped.
 3. **v1.1 feature epic: spec + design**, covering sequential "next slide" navigation that does not
-   depend on hotspots, and SVG images (D12 amendment).
+   depend on hotspots, SVG images (D12 amendment), and blank drill-downs when the file is viewed
+   inside SharePoint/OneDrive's preview [#16].
 4. Owner hardware checks, still open: browser matrix and A14 on real hardware [#12], initial-open time
    [#13], screen readers [#14].
