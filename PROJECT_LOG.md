@@ -19,14 +19,14 @@ exports as one HTML file that runs by double-clicking. Per-session detail lives 
 | Date | Topic | Log |
 |---|---|---|
 | 2026-11-06 | v1 built end to end: spike, design, plan, 11 stories, sample, acceptance report | [`2026-11-06_v1-build.md`](project-logs/2026-11-06_v1-build.md) |
+| 2026-11-12 | v1.1 built on feat/v1.1 — 11 tasks, 186 unit / 306 browser tests, 0.2.0 | [`2026-11-12_v1.1-build.md`](project-logs/2026-11-12_v1.1-build.md) |
 | 2026-11-12 | Owner reviewed the design decisions (21 approved, D11/D12 amended); note bug #15 reproduced | [`2026-11-12_decision-review-and-v1.1.md`](project-logs/2026-11-12_decision-review-and-v1.1.md) |
 
 ## Next Session Should Start With
 
-1. ~~Fix the note bug [#15]~~ done 2026-11-12.
-2. The D11 amendment (ZIP clutter) is now story S8 of the v1.1 design.
-3. **v1.1 epic: build.** The plan is awaiting the owner's review and choice of execution method.
-   Order: S1 #17 + S2 #18 → S3 #19 / S4 #20 → S5 #21; spikes SP-1 → S6 #22 and SP-2 → S7 #16; S8 #23
-   at any time; S9 #24 last. Browser runs never in parallel.
-4. Owner hardware checks, still open: browser matrix and A14 on real hardware [#12], initial-open time
+1. **Merge `feat/v1.1` into main** once the owner approves, then push. Remove the worktree
+   `/home/sadmin/pde-wt-v11` after the merge.
+2. **LG-1: the owner's SharePoint check** (`docs/lg1-sharepoint-check.md`). #16 stays open until the
+   console capture is attached.
+3. Owner hardware checks, still open: browser matrix and A14 on real hardware [#12], initial-open time
    [#13], screen readers [#14].
