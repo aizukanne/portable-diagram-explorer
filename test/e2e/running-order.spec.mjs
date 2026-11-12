@@ -34,6 +34,11 @@ test('A15: build, reorder (drag and keyboard), undo, save, reopen: order kept', 
   await expect(rows).toHaveText([/Identity HLD/, /Shared services/, /Loop A/]);
   await rows.nth(2).getByRole('button', { name: 'Move up' }).click();
   await expect(rows).toHaveText([/Identity HLD/, /Loop A/, /Shared services/]);
+  await expect(page.locator('.pde-status')).toHaveText('Moved Loop A to position 2 of 3');
+  await rows.nth(1).getByRole('button', { name: 'Move down' }).click();
+  await expect(page.locator('.pde-status')).toHaveText('Moved Loop A to position 3 of 3');
+  await rows.nth(2).getByRole('button', { name: 'Move up' }).click();
+  await expect(page.locator('.pde-status')).toHaveText('Moved Loop A to position 2 of 3');
   await rows.nth(0).dragTo(rows.nth(2));
   await expect(rows).toHaveText([/Loop A/, /Shared services/, /Identity HLD/]);
   await page.keyboard.press('Control+z');

@@ -231,7 +231,10 @@ export class EditorApp {
       if (refocus && refocus.heading) heading.focus();
       return;
     }
-    const move = (id, to, label = 'Reorder running order') => this.edit((q) => moveInSequence(q, id, to), { label });
+    const move = (id, to, label = 'Reorder running order') => {
+      this.edit((q) => moveInSequence(q, id, to), { label });
+      this.status(`Moved ${titleOf(id)} to position ${to + 1} of ${slides.length}`);
+    };
     const list = h('ol', { class: 'pde-seq-list', 'aria-label': 'Running order' });
     slides.forEach((id, i) => {
       const act = (name, text, onClick, disabled) => button(text, () => { this.seqFocus = { id, name }; onClick(); }, { iconOnly: true, icon: name === 'up' ? '↑' : name === 'down' ? '↓' : '✕', disabled, attrs: { 'data-seq': name } });
