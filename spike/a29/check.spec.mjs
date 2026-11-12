@@ -1,5 +1,12 @@
 // A29 (compatibility): a v1.1 file opened in the REAL v1 editor (build of commit 007c71c, version 0.1.0)
 // must get v1's own "made by a newer version" error, keep the open project, and lose nothing.
+// To repeat (from the repo root; the worktree must be OUTSIDE the repo, never under /tmp):
+//   git worktree add /home/sadmin/pde-v010-a29 007c71c
+//   (cd /home/sadmin/pde-v010-a29 && node build/build.mjs)
+//   cp /home/sadmin/pde-v010-a29/dist/editor.html spike/a29/v010-editor.html
+//   npm run build   # the current editor and its test fixtures in dist/
+//   PW_CONFIG=spike/a29/playwright.config.mjs scripts/e2e.sh
+//   git worktree remove /home/sadmin/pde-v010-a29 && git worktree prune
 // Throwaway check; the v1 editor is copied to spike/a29/v010-editor.html (gitignored).
 import { test, expect } from '@playwright/test';
 import { pathToFileURL } from 'node:url';

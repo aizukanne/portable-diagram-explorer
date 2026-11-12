@@ -118,7 +118,7 @@ things:
 Whenever a presentation runs inside another page, a notice says so and suggests downloading the file and
 opening it in a browser. If the in-page fallback is running, the notice adds that drill-downs are shown with
 reduced isolation. **Dismiss** hides the notice for that visit (it comes back if the fallback starts later). The notice
-never appears when the file is opened directly or in the editor's own preview.
+does not appear when the file is opened directly or in the editor's own preview (the reduced-isolation sentence would still appear if the in-page fallback ever ran there).
 
 **This is tested against a model of SharePoint's rules, not against SharePoint.** The owner's own check is
 described in `docs/lg1-sharepoint-check.md` and has not been run yet.
