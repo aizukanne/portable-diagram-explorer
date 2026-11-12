@@ -25,6 +25,11 @@
   policy blocking our drill-down frame's script (hash `do+AvlM…` matches the v1 build). This is a
   different defect from #15 and not fixed by the review rulings. It goes into the v1.1 spec.
 
+- **v1.1 spec + design drafted:** `docs/superpowers/specs/2026-11-12-pde-v1.1-design.md`. It records
+  the owner's rulings R1-R9, and every other choice is marked as an agent call. A builder check by an
+  independent agent raised 12 questions; all were settled without an owner ruling (§5.8). One real gap
+  was found: the frame protocol's image check rejects SVG.
+
 ## Key decisions
 
 - The two amendments are behaviour changes, so each gets an issue and a regression test. They are not
