@@ -18,6 +18,21 @@ const DEFAULT_SETTINGS = { tooltipDelayMs: 350, showHotspotHints: true };
 // rendering in the page.
 const NOTICE_BASE = 'This presentation is being shown inside another site, which limits what it can do. For the full experience, download the file and open it in your browser.';
 const NOTICE_FALLBACK = 'Drill-down diagrams are being shown with reduced isolation.';
+const LOADING_TEXT = 'Loading diagram…';
+
+// Inside another page's frame? Reading win.top can throw across origins, and a throw
+// means we are hosted.
+export function isHostedWindow(win) {
+  try { return win.top !== win.self; } catch { return true; }
+}
+
+// The one decision about the notice: its text, or '' for none. The editor's own
+// preview (embedded) never shows it. If the fallback happened while not hosted, the
+// base sentence would be false, so only the isolation sentence shows.
+export function hostNoticeText({ embedded, hosted, fallback }) {
+  if (embedded) return '';
+  return [hosted ? NOTICE_BASE : '', fallback ? NOTICE_FALLBACK : ''].filter(Boolean).join(' ');
+}
 
 export function sceneOf(project, diagram) {
   const asset = project.assets.find((a) => a.id === diagram.assetId);
@@ -136,29 +151,37 @@ export class Viewer {
 
   // ---- host notice ---------------------------------------------------------
 
-  // Inside another page's frame? Reading window.top can throw across origins, and a
-  // throw means we are hosted. The editor's own preview never shows the notice.
-  isHosted() {
-    if (this.embedded) return false;
-    try { return window.top !== window.self; } catch { return true; }
-  }
+  isHosted() { return !this.embedded && isHostedWindow(window); }
 
   // Build, update or remove the notice from the current state. `revive` shows it even
   // if the user dismissed it (the isolation state changed, so they should know).
   syncNotice({ revive = false } = {}) {
-    if (this.embedded) return;
+    const text = hostNoticeText({ embedded: this.embedded, hosted: isHostedWindow(window), fallback: this.fallback });
+    if (!text) return;
     if (revive) this.noticeDismissed = false;
     if (this.noticeDismissed) return;
-    const text = [this.isHosted() ? NOTICE_BASE : '', this.fallback ? NOTICE_FALLBACK : ''].filter(Boolean).join(' ');
-    if (!text) return;
     if (!this.notice) {
       this.noticeText = h('p', { class: 'pde-host-notice-text' });
       this.notice = h('div', { class: 'pde-host-notice', role: 'status' }, this.noticeText,
         button('Dismiss', () => this.dismissNotice(), { cls: 'pde-link' }));
-      this.toolbar.after(this.notice);
     }
     this.noticeText.textContent = text;
+    this.placeNotice();
   }
+
+  // One notice, kept where it can be seen: inside the drill-down dialog while that is
+  // open (the dialog's backdrop covers the page), after the toolbar otherwise.
+  placeNotice() {
+    if (!this.notice) return;
+    if (this.nav.isOpen) this.modalHead.after(this.notice); else this.toolbar.after(this.notice);
+  }
+
+  showLoading() {
+    this.loading.textContent = LOADING_TEXT;
+    this.loading.hidden = false;
+  }
+
+  hideLoading() { this.loading.hidden = true; }
 
   showHostNotice() { this.syncNotice({ revive: true }); }
 
@@ -219,11 +242,12 @@ export class Viewer {
     this.modalListBtn = button('Components', () => this.togglePanel('modal', 'list'), { icon: '☰', attrs: { 'aria-expanded': 'false' } });
     this.modalAboutBtn = button('About this diagram', () => this.togglePanel('modal', 'about'), { icon: 'ⓘ', attrs: { 'aria-expanded': 'false' } });
     this.frameHost = h('div', { class: 'pde-frame-host' });
+    this.loading = h('div', { class: 'pde-loading', role: 'status', hidden: true });
     this.modalPanel = new SidePanel(this, 'modal');
     const sentinel = (where) => h('span', { class: 'pde-sentinel', tabindex: '0', 'aria-hidden': 'true', on: { focus: () => this.wrapFocus(where) } });
     this.modal = h('div', { class: 'pde-modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pde-modal-title' },
       sentinel('start'),
-      h('div', { class: 'pde-modal-head' },
+      (this.modalHead = h('div', { class: 'pde-modal-head' },
         h('div', { class: 'pde-modal-nav' }, this.backBtn,
           h('nav', { class: 'pde-crumbs', 'aria-label': 'Breadcrumbs' }, this.crumbs)),
         this.modalTitle,
@@ -235,8 +259,8 @@ export class Viewer {
           button('Zoom in', () => this.bridge.command('zoomIn'), { icon: '+', iconOnly: true }),
           h('span', { class: 'pde-sep', 'aria-hidden': 'true' }),
           (this.overviewBtn = button('Overview', () => this.closeModal(), { icon: '⌂' })),
-          button('Close', () => this.closeModal(), { cls: 'pde-primary', icon: '✕' }))),
-      h('div', { class: 'pde-modal-body' }, this.frameHost, this.modalPanel.el),
+          button('Close', () => this.closeModal(), { cls: 'pde-primary', icon: '✕' })))),
+      h('div', { class: 'pde-modal-body' }, this.frameHost, this.modalPanel.el, this.loading),
       sentinel('end'));
     this.modalLayer = h('div', { class: 'pde-modal-layer', hidden: true }, h('div', { class: 'pde-backdrop' }), this.modal);
     this.live = h('div', { class: 'pde-sr-only', role: 'status', 'aria-live': 'polite' });
@@ -464,10 +488,17 @@ export class Viewer {
   onFrameStartFailed() {
     if (this.fallback) return;
     this.fallback = true;
+    // Destroying the frame drops focus to the page; if it was in the frame (or nowhere),
+    // put it back on the dialog heading, as when a diagram opens.
+    const lostFocus = this.focusInBridge() || !document.activeElement || document.activeElement === document.body;
     if (this.bridge) this.bridge.destroy();
     this.bridge = new InPageScene(this.frameHost, this.bridgeHandlers());
+    this.hideLoading();
     this.showHostNotice();
-    if (this.nav.isOpen) this.renderCurrent({});
+    if (this.nav.isOpen) {
+      if (lostFocus) this.modalTitle.focus();
+      this.renderCurrent({});
+    }
   }
 
   openModal() {
@@ -483,6 +514,7 @@ export class Viewer {
     if (this.slidebar) this.slidebar.inert = true;
     this.rootRenderer.hideTooltip();
     this.modalLayer.hidden = false;
+    this.placeNotice();
   }
 
   renderCurrent({ focus } = {}) {
@@ -504,8 +536,16 @@ export class Viewer {
     // the frame restores focus itself (it already holds window focus).
     if (focus === 'open') this.modalTitle.focus();
     else if (focus === 'restore' && (!document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected)) this.backBtn.focus();
+    // While the frame has not started, the dialog would be blank: say so (visibly and to
+    // screen readers) until the scene is shown or the in-page fallback takes over.
+    if (!this.bridge.ready) this.showLoading();
     return this.bridge.render(sceneOf(this.project, d), this.assets.dataUrl(d.assetId), entry.viewport, entry.selectedHotspotId, { ...this.settings })
-      .catch((e) => { if (!(e && e.startFailed)) this.announce(e.message); });
+      .then((r) => { if (!(r && r.superseded)) this.hideLoading(); })
+      .catch((e) => {
+        if (e && e.startFailed) return; // the fallback replays this render
+        this.hideLoading();
+        this.announce(e.message);
+      });
   }
 
   renderCrumbs() {
@@ -564,6 +604,7 @@ export class Viewer {
     this.originHotspotId = null;
     if (restoreFocus && !(focusId && this.rootRenderer.focusHotspot(focusId, { quiet: true }))) this.rootRenderer.focusEdge('first');
     this.modalLayer.hidden = true;
+    this.placeNotice();
     if (restoreFocus) this.announce(this.pageDiagramId === this.project.rootDiagramId ? 'Overview' : `Slide: ${this.pageDiagram().title}`);
   }
 

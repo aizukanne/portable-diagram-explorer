@@ -88,7 +88,7 @@ button { font: inherit; color: inherit; }
 .pde-modal-head { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; padding: .5rem .75rem; border-bottom: 1px solid var(--pde-line); background: var(--pde-bar); }
 .pde-modal-nav { display: flex; align-items: center; gap: .5rem; min-width: 0; flex: 1 1 320px; }
 .pde-modal-title { font-size: 16px; margin: 0; flex: 1 1 auto; order: 3; width: 100%; }
-.pde-modal-body { flex: 1; display: flex; min-height: 0; }
+.pde-modal-body { flex: 1; display: flex; min-height: 0; position: relative; }
 .pde-frame-host { flex: 1; min-width: 0; display: flex; }
 .pde-frame { flex: 1; width: 100%; height: 100%; border: 0; display: block; background: var(--pde-canvas); }
 .pde-sentinel { position: absolute; width: 1px; height: 1px; overflow: hidden; }
@@ -213,3 +213,12 @@ button { font: inherit; color: inherit; }
 
 /* The drill-down rendered in the page when the sealed frame cannot start. */
 .pde-inpage-scene { flex: 1; min-width: 0; position: relative; }
+
+/* Shown in the dialog while the sealed frame has not started. */
+.pde-loading {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  pointer-events: none; color: var(--pde-muted); font-weight: 600;
+}
+.pde-loading[hidden] { display: none; }
+/* In the dialog the notice must not shrink away in the flex column. */
+.pde-modal > .pde-host-notice { flex: none; }

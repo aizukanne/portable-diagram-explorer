@@ -31,8 +31,10 @@ test('the harness reproduces #16 before the fix (run once in Step 6, then keep a
   } else {
     await expect.poll(() => violations.some((v) => v.includes(FRAME_SCRIPT_HASH)), { message: violations.join('\n') }).toBe(true); // the frame's own hash is the one refused
   }
-  // Whatever the fix does, the sealed frame itself must not have rendered anything.
-  await expect(inner(page).frameLocator('iframe.pde-frame').locator('.pde-image')).toHaveCount(0);
+  // After the fix the refused frame is replaced by the in-page scene (before it, nothing
+  // rendered at all, so this fails): the scene is there and no sealed frame remains.
+  await expect(inner(page).locator('.pde-modal .pde-inpage-scene .pde-image')).toBeVisible({ timeout: FRAME_START_DEADLINE_MS + 5000 });
+  await expect(inner(page).locator('iframe.pde-frame')).toHaveCount(0);
 });
 
 test('A25 (H1 model): host nonce is passed on; drill-down renders in the sealed frame', async ({ page }) => {
@@ -42,6 +44,7 @@ test('A25 (H1 model): host nonce is passed on; drill-down renders in the sealed 
   await expect(inner(page).locator('.pde-host-notice')).toContainText('For the full experience, download the file');
   await expect(inner(page).locator('.pde-host-notice')).not.toContainText('reduced isolation');
   await expect(inner(page).locator('.pde-inpage-scene')).toHaveCount(0);
+  await expect(inner(page).locator('.pde-loading')).toBeHidden();
 });
 
 test('bridge: a frame that never sends READY triggers onStartFailed within the deadline', async ({ page }) => {
@@ -58,15 +61,30 @@ test('bridge: a healthy frame does not trigger onStartFailed', async ({ page }) 
   expect(await page.evaluate(() => window.__startFailedAt)).toBe(0);
 });
 
-for (const f of ['hosted-hash-only.html']) {
-  test(`A26: frame cannot start (${f}) -> in-page fallback within the deadline, notice says so`, async ({ page }) => {
-    await host(page, f);
+test('A26: frame cannot start (hosted-hash-only.html) -> in-page fallback within the deadline, notice says so', async ({ page }) => {
+    await host(page, 'hosted-hash-only.html');
     const t0 = Date.now();
     await inner(page).locator('.pde-root-view rect.pde-hotspot').first().click();
+    // While the frame is starting the dialog says so (visible text, and a status for screen readers).
+    await expect(inner(page).locator('.pde-modal .pde-loading')).toHaveText('Loading diagram…');
+    await expect(inner(page).locator('.pde-modal .pde-loading')).toBeVisible();
+    // Put focus in the sealed frame, as a user working there would have it.
+    await inner(page).locator('iframe.pde-frame').focus();
     await expect(inner(page).locator('.pde-modal .pde-inpage-scene .pde-image')).toBeVisible({ timeout: FRAME_START_DEADLINE_MS + 5000 });
     expect(Date.now() - t0).toBeLessThan(FRAME_START_DEADLINE_MS + 5000);
+    await expect(inner(page).locator('.pde-loading')).toBeHidden();
     await expect(inner(page).locator('.pde-host-notice')).toContainText('Drill-down diagrams are being shown with reduced isolation.');
     await expect(inner(page).locator('.pde-host-notice')).toContainText('For the full experience, download the file');
+    // The notice is visible and clickable OVER the open drill-down, not behind its backdrop.
+    const notice = inner(page).locator('.pde-modal .pde-host-notice');
+    await expect(notice).toBeVisible();
+    await expect(notice.getByRole('button', { name: 'Dismiss' })).toBeVisible();
+    expect(await notice.getByRole('button', { name: 'Dismiss' }).evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+    })).toBe(true);
+    // The swap took focus from the destroyed frame; it is back on the dialog heading.
+    await expect(inner(page).locator('.pde-modal-title')).toBeFocused();
     // The sealed frame is gone for the session.
     await expect(inner(page).locator('iframe.pde-frame')).toHaveCount(0);
     // Navigation still works in the fallback: Back, breadcrumbs, and going deeper.
@@ -82,8 +100,9 @@ for (const f of ['hosted-hash-only.html']) {
     await expect(inner(page).locator('.pde-modal .pde-inpage-scene .pde-image')).toBeVisible();
     await inner(page).getByRole('button', { name: 'Close', exact: true }).click();
     await expect(inner(page).locator('.pde-modal-layer')).toBeHidden();
-  });
-}
+    // Closed again: the one notice is back on the page, after the toolbar.
+    await expect(inner(page).locator('.pde-toolbar + .pde-host-notice')).toBeVisible();
+});
 
 test('A26b: in the fallback the slide keys reach the viewer exactly once, and Escape closes the drill-down', async ({ page }) => {
   await host(page, 'hosted-hash-only-slides.html');
@@ -104,6 +123,24 @@ test('A26b: in the fallback the slide keys reach the viewer exactly once, and Es
   await expect(inner(page).locator('.pde-modal-layer')).toBeHidden();
   // The overview is not in this running order, so the label starts empty; one key is one step.
   await expect(slideLabel).toHaveText('1 of 3');
+  // Next once more, then Previous from inside a drill-down: one key, one step back.
+  await page.keyboard.press('ArrowRight');
+  await expect(slideLabel).toHaveText('2 of 3');
+  await inner(page).locator('.pde-root-view rect.pde-hotspot').first().click();
+  await expect(scene.locator('.pde-image')).toBeVisible();
+  await scene.locator('rect.pde-hotspot').first().focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(inner(page).locator('.pde-modal-layer')).toBeHidden();
+  await expect(slideLabel).toHaveText('1 of 3');
+  // Back (Backspace) from a second level returns to the first level, once.
+  await inner(page).locator('.pde-root-view rect.pde-hotspot').first().click();
+  await expect(inner(page).locator('.pde-modal-title')).toHaveText('Loop B');
+  await scene.locator('rect.pde-hotspot').first().click();
+  await expect(inner(page).locator('.pde-modal-title')).toHaveText('Loop A');
+  await scene.locator('rect.pde-hotspot').first().focus();
+  await page.keyboard.press('Backspace');
+  await expect(inner(page).locator('.pde-modal-title')).toHaveText('Loop B');
+  await expect(inner(page).locator('.pde-modal-layer')).toBeVisible();
 });
 
 test('A27: no notice on file:// or in the editor preview; Dismiss hides it', async ({ page }) => {
@@ -120,7 +157,8 @@ test('A26c: a notice dismissed earlier comes back when the fallback changes the 
   await inner(page).getByRole('button', { name: 'Dismiss' }).click();
   await expect(inner(page).locator('.pde-host-notice')).toHaveCount(0);
   await inner(page).locator('.pde-root-view rect.pde-hotspot').first().click();
-  await expect(inner(page).locator('.pde-host-notice')).toContainText('reduced isolation', { timeout: FRAME_START_DEADLINE_MS + 5000 });
+  await expect(inner(page).locator('.pde-modal .pde-host-notice')).toContainText('reduced isolation', { timeout: FRAME_START_DEADLINE_MS + 5000 });
+  await expect(inner(page).locator('.pde-modal .pde-host-notice')).toBeVisible();
 });
 
 test('Review focus 4: a malformed nonce is ignored, the frame starts as on file://', async ({ page }) => {

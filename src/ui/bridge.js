@@ -18,6 +18,16 @@ const RENDER_TIMEOUT_MS = 20000;
 export const FRAME_START_DEADLINE_MS = 4000;
 const NONCE_MARK = '__NONCE_ATTR__';
 
+// The frame document for one frame: both nonce marks filled and the channel set. A nonce
+// that is not plain base64 text is treated as absent: it cannot carry a quote or an angle
+// bracket into the markup, whatever the host page put in the attribute. Function
+// replacements are used throughout: a string one would interpret "$'" and "$&" in a value.
+export function frameSrcdoc(template, nonce, channel) {
+  if (template.split(NONCE_MARK).length !== 3) throw new Error('frame template must carry exactly two nonce marks');
+  const attr = typeof nonce === 'string' && NONCE_RE.test(nonce) ? ` nonce="${nonce}"` : '';
+  return template.replaceAll(NONCE_MARK, () => attr).replace('__CHANNEL__', () => channel);
+}
+
 export class FrameBridge {
   // `nonce` is the host page's CSP nonce, if it has one; it is written into the frame's
   // two inline tags and nowhere else, and only if it is a plain nonce (NONCE_RE).
@@ -41,12 +51,7 @@ export class FrameBridge {
     this.frame.setAttribute('referrerpolicy', 'no-referrer');
     this.frame.className = 'pde-frame';
     this.frame.title = title;
-    if (template.split(NONCE_MARK).length !== 3) throw new Error('frame template must carry exactly two nonce marks');
-    // A nonce that is not plain base64 text is treated as absent: it cannot carry a quote
-    // or an angle bracket into the markup, whatever the host page put in the attribute.
-    const attr = typeof nonce === 'string' && NONCE_RE.test(nonce) ? ` nonce="${nonce}"` : '';
-    // Function replacements: a string one would interpret "$'" and "$&" in the value.
-    this.frame.srcdoc = template.replaceAll(NONCE_MARK, () => attr).replace('__CHANNEL__', () => this.channel);
+    this.frame.srcdoc = frameSrcdoc(template, nonce, this.channel);
     this.onMessage = (e) => this.receive(e);
     window.addEventListener('message', this.onMessage);
     container.append(this.frame);
