@@ -24,10 +24,17 @@ exports as one HTML file that runs by double-clicking. Per-session detail lives 
 
 ## Next Session Should Start With
 
-1. ~~Merge `feat/v1.1` and push~~ done 2026-11-12 (main 136028d pushed; #15, #17–#24 closed; worktree
-   removed; build ledger copy in ~/backups/pde-v1.1-sdd/). GitHub release v0.2.0 published with editor.html
-   and the sample files (asset hashes verified after upload).
-2. **LG-1: the owner's SharePoint check** (`docs/lg1-sharepoint-check.md`). #16 stays open until the
-   console capture is attached.
-3. Owner hardware checks, still open: browser matrix and A14 on real hardware [#12], initial-open time
-   [#13], screen readers [#14].
+Version 0.2.0 (v1.1) is merged, pushed and released:
+https://github.com/aizukanne/portable-diagram-explorer/releases/tag/v0.2.0 (detail:
+[`2026-11-12_v1.1-build.md`](project-logs/2026-11-12_v1.1-build.md)).
+
+1. **LG-1: the owner's SharePoint check.** Use the release's `customer-platform.presentation.html` and
+   follow `docs/lg1-sharepoint-check.md`. Attach the console capture to #16, which then closes. Do this
+   before anything else: it is the only proof the hosted-viewer fix works on the real host.
+2. **Owner hardware checks:** #12 (Safari, Edge, laptop A14, SVG sharpness at DPR 2), #13 (initial-open
+   time in Firefox and WebKit), #14 (screen readers and forced colours).
+3. **If LG-1 fails,** read the notice text it recorded:
+   - "reduced isolation" present means the fallback ran;
+   - absent with an empty window means neither path worked.
+
+   Then start from the console capture in #16 and `spike/frame-ready/REPORT.md`.
